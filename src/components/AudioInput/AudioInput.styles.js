@@ -39,7 +39,16 @@ export const DropZoneContainer = styled.div`
     color: #000;
   }
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  font-size: 1.25vw; /* 1.25% of the viewport width */
+   @media (min-width: 768px) {
+    ${tw`flex-row`}
+  }
+  font-size: 16px; // Base font size
+  @media (max-width: 768px) {
+    font-size: 14px; // Smaller font size for tablets
+  }
+  @media (max-width: 480px) {
+    font-size: 12px; // Even smaller font size for mobile phones
+  }
 `;
 
 export const RecordingArea = styled.div`
