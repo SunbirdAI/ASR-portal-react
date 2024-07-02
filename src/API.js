@@ -3,7 +3,8 @@
 const FEEDBACK_URL = process.env.REACT_APP_FEEDBACK_URL;
 // const HUGGING_FACE_API_KEY = process.env.REACT_APP_HUGGING_FACE_API_KEY;
 export const tracking_id = process.env.REACT_APP_GA4_TRACKING_ID;
-export const token = process.env.REACT_APP_SB_API_TOKEN;
+export const token = localStorage.getItem('access_token') ? localStorage.getItem('access_token') : process.env.REACT_APP_SB_API_TOKEN;
+console.log(`Current Token: ${token}`)
 
 const asrUrl = `${process.env.REACT_APP_SB_API_URL}/tasks/stt`;
 
@@ -25,47 +26,51 @@ export async function recognizeSpeech(audioData, languageCode, adapterCode) {
   formData.append("adapter", adapterCode);
 
   try {
+
     const response = await fetch(asrUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.REACT_APP_SB_API_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
       body: formData,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-    const data = await response.json();
-    return data.audio_transcription;
-  } catch (error) {
-    console.error("Error recognizing speech:", error);
-    throw error; // Re-throw the error to be handled by the caller
-  }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error recognizing speech:', error);
+        throw error; // Re-throw the error to be handled by the caller
+    }
 }
 
-export async function getTranscripts() {
-  try {
-    const response = await fetch(`${asrDbUrl}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${process.env.REACT_APP_SB_API_TOKEN}`,
-        Accept: "application/json",
-      },
-    });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+
+export async function getTranscripts(){
+    const ascendingTranscriptUrl = `${asrDbUrl}?order_by=uploaded&descending=true`
+    try{
+        const response = await fetch(`${ascendingTranscriptUrl}`, {
+            method: "GET",
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            },
+        })
+
+        if(!response.ok){
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch(error){
+        console.log(error);
+        throw error;
     }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.log(error);
-    throw error;
-  }
 }
 
 export async function getSingleTranscript(id) {
@@ -74,7 +79,7 @@ export async function getSingleTranscript(id) {
     const response = await fetch(asrDbSingleUrl, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${process.env.REACT_APP_SB_API_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
     });
@@ -100,7 +105,7 @@ export async function updateTranscript(id, transcript) {
     const response = await fetch(asrDbUpdateUrl, {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${process.env.REACT_APP_SB_API_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
       body: formData,
@@ -156,6 +161,48 @@ export const registerNewAccount = async (values) => {
   }
   return data;
 };
+
+// function getCookie(name) {
+//     const value = `; ${document.cookie}`;
+//     console.log(value);
+//     const parts = value.split(`; ${name}=`);
+//     if (parts.length === 2) return parts.pop().split(';').shift();
+// }
+
+export const loginIntoAccount = async (values) => {
+    let data = {};
+    const formData = new FormData();
+    formData.append("username", values.username);
+    formData.append("password", values.password);
+
+  
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_SB_API_URL}/auth/token`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+          },
+          body: formData,
+        }
+      );
+      const responseBody = await response.json()
+      console.log(`Response: ${response.ok} Status code: ${response.status}`)
+      if(response.status === 200){
+        
+        data.success = "Successful Login!"
+        localStorage.setItem("access_token",responseBody.access_token)
+      }else if(response.status === 401){
+        data.error=responseBody.detail
+      }
+    } catch (error) {
+      data.error = "Something went wrong";
+      console.error("Error occurred during form submission:", error);
+      throw error;
+    }
+    return data;
+  };
 
 const extractErrorMessageFromHTML = (html) => {
   const parser = new DOMParser();

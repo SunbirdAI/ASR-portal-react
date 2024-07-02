@@ -122,10 +122,7 @@ const DataTable = ({transcriptData}) => {
 									className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
 									Uploaded
 								</th>
-								<th
-									className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-									Username
-								</th>
+								
 								<th
 									className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
 									Actions
@@ -152,11 +149,11 @@ const DataTable = ({transcriptData}) => {
 								<td className="px-5 py-5 border-b border-gray-200 text-sm">
 									<p className="text-gray-900 whitespace-no-wrap">{uploaded}</p>
 								</td>
-								<td className="px-5 py-5 border-b border-gray-200 text-sm">
+								{/* <td className="px-5 py-5 border-b border-gray-200 text-sm">
 									<p className="text-gray-900 whitespace-no-wrap">
 										{username}
 									</p>
-								</td>
+								</td> */}
 								
 								
                                 <td className="px-5 py-5 border-b border-gray-200 text-sm relative">

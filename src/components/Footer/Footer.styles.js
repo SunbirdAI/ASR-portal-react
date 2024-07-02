@@ -37,6 +37,13 @@ export const ButtonContainer = styled.div`
   }
 `;
 
+export const EditButtonContainer = styled.div`
+  ${tw`absolute right-40 max-sm:right-20 bottom-4`}
+  @media (max-width: 60px) {
+    ${tw`relative mt-4`}
+  }
+`;
+
 export const TextNav = styled.p`
   ${tw`hidden md:flex`}
   font-size: 16px; // Base font size for larger screens

@@ -40,6 +40,7 @@ const Transcription = () => {
     const [audioSrc, setAudioSrc] = useState(''); // Store the audio source URL or blob
     const [audioData, setAudioData] = useState(null); // Store the audio data blob
     const [copySuccess, setCopySuccess] = useState(false);
+    const [transcriptId, setTranscriptId] = useState(null)
 
     const copyToClipboard = async () => {
         try {
@@ -51,17 +52,21 @@ const Transcription = () => {
         }
     }
 
+
     // Handles the submission of audio data for recognition
     const handleAudioSubmit = useCallback(async () => {
         if (!audioData) return;
 
         setIsLoading(true);
         try {
-            const transcript = await recognizeSpeech(audioData, language, language); // Process the audio to text
+            const data = await recognizeSpeech(audioData, language, language); // Process the audio to text
+            const transcript = data.audio_transcription
+            const id = data.audio_transcription_id
             console.log("Transcription: " + transcript);
             console.log("Language: " + language);
+            console.log("Transcription id: " + id)
             setAudioSrc(URL.createObjectURL(audioData)); // Assuming audioData is a Blob
-
+            setTranscriptId(id)
             setTextOutput(transcript);
         } catch (e) {
             console.log(e);
@@ -110,7 +115,7 @@ const Transcription = () => {
                 setText={setTextOutput}
                 isLoading={isLoading}
             />
-            {audioData && <Footer audioSrc={audioSrc} text={textOutput} copyToClipboard={copyToClipboard} copySuccess={copySuccess} ></Footer>}
+            {audioData && <Footer audioSrc={audioSrc} text={textOutput} copyToClipboard={copyToClipboard} copySuccess={copySuccess} id={transcriptId} ></Footer>}
         </DynamicMainContainer>
     );
 };

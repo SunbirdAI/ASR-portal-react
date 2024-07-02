@@ -21,10 +21,15 @@ export const DropdownMenu = () => {
 
   const [isOpen, setIsOpen] = useState(false)
 
+  function removeAccessToken() {
+    localStorage.removeItem('access_token');
+  }
+
 
   const navItems = [
     {path:"/",link:"Home"},
-    {path:"/files",link:"Recent Files"}
+    {path:"/files",link:"Recent Files"},
+    {path:"/login",link:"Logout"}
 
   ]
 
@@ -63,7 +68,17 @@ export const DropdownMenu = () => {
         {isOpen && (
           <ul onMouseLeave={toggleDropdown}  className="absolute rounded-lg top-full right-0 mt-2 w-40 bg-white shadow-lg ring-1 ring-gray-300 transition-all duration-300">
 
-            {navItems.map(({link, path}) => <li key={path} className="py-3 px-5 text-start text-medium hover:bg-blue-100 hover:text-large cursor-pointer">
+            {navItems.map(({link, path}) =>  link === "Logout" ? 
+            <li key={path} onClick={removeAccessToken} className="py-3 px-5 text-start text-medium hover:bg-blue-100 hover:text-large cursor-pointer">
+            <NavLink to={path} className={({ isActive, isPending }) =>
+                isActive
+                  ? "active block"
+                  : isPending
+                    ? "pending block"
+                    : "block"
+              }>{link}</NavLink>
+              </li>
+            : <li key={path} className="py-3 px-5 text-start text-medium hover:bg-blue-100 hover:text-large cursor-pointer">
             <NavLink to={path} className={({ isActive, isPending }) =>
                 isActive
                   ? "active block"
@@ -86,7 +101,7 @@ export const Title = styled.h1`
     font-semibold
     text-white
     text-4xl
-    md:absolute
+    
     w-full
     max-md:hidden
     
@@ -105,3 +120,18 @@ export const Logo = styled.img`
     ${tw`h-8`} /* Adjust as needed */
   }
 `;
+
+export const LoginButton = styled.button`
+${tw`
+px-3
+py-2
+text-white
+bg-sunbird-orange
+rounded-md
+inline-flex
+items-center
+justify-center
+hover:opacity-90
+cursor-pointer
+
+`}`;

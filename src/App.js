@@ -5,21 +5,28 @@ import Header from "./components/Header";
 import Transcription from "./components/Transcription";
 import { useEffect } from "react";
 import { tracking_id } from "./API";
-import { HashRouter as Router, Route, Routes } from "react-router-dom";
+import { HashRouter as Router, Route, Routes, useLocation } from "react-router-dom";
 import View from "./components/View";
 import Files from "./components/Files";
 import SignUpForm from "./components/Auth/SignUp";
+import SignInForm from "./components/Auth/SignIn";
 
-function App() {
+function AppComponent() {
   useEffect(() => {
     ReactGA.initialize(tracking_id);
     ReactGA.send("pageview");
   }, []);
 
+  const location = useLocation();
+
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+
+
+
   return (
-    <Router>
+    <>
       <div className="h-screen">
-        <Header />
+      {!isAuthPage && <Header />}
         <Routes>
           <Route
             path="/"
@@ -46,10 +53,17 @@ function App() {
             }
           />
           <Route path="/register" element={<SignUpForm />} />
+          <Route path="/login" element={<SignInForm/>} />
         </Routes>
       </div>
-    </Router>
+    </>
   );
+}
+
+function App(){
+    return <Router>
+        <AppComponent/>
+    </Router>
 }
 
 export default App;
