@@ -29,7 +29,8 @@ export const DropdownMenu = () => {
   const navItems = [
     {path:"/",link:"Home"},
     {path:"/files",link:"Recent Files"},
-    {path:"/login",link:"Logout"}
+    {path:"/login",link:"Logout"},
+    {path:"/change-password",link:"Change Password"}
 
   ]
 
@@ -66,10 +67,10 @@ export const DropdownMenu = () => {
         </button>
   
         {isOpen && (
-          <ul onMouseLeave={toggleDropdown}  className="absolute rounded-lg top-full right-0 mt-2 w-40 bg-white shadow-lg ring-1 ring-gray-300 transition-all duration-300">
+          <ul onMouseLeave={toggleDropdown}  className="absolute rounded-lg top-full right-0 mt-2 w-60 bg-white shadow-lg ring-1 ring-gray-300 transition-all duration-300">
 
             {navItems.map(({link, path}) =>  link === "Logout" ? 
-            <li key={path} onClick={removeAccessToken} className="py-3 px-5 text-start text-medium hover:bg-blue-100 hover:text-large cursor-pointer">
+            <li key={path} onClick={removeAccessToken} className="py-3 px-5 text-start text-medium hover:bg-blue-100 hover:text-large cursor-pointer ">
             <NavLink to={path} className={({ isActive, isPending }) =>
                 isActive
                   ? "active block"

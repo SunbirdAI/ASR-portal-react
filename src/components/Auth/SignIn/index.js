@@ -112,7 +112,7 @@ const SignInForm = () => {
             )}
           />
           <div className="w-full mb-7">
-            <NavLink to="#" className="text-sm font-medium hover:underline hover:text-sunbird-orange ease-out duration-[0.3s]" >Forgot Password?</NavLink>
+            <NavLink to="/forgot-password" className="text-sm font-medium hover:underline hover:text-sunbird-orange ease-out duration-[0.3s]" >Forgot Password?</NavLink>
           </div>
 
           
