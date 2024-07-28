@@ -9,19 +9,22 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../../UI/Form";
-import { Input } from "../../UI/Input";
+} from "../../Form";
+import { Input } from "../../Input";
 import { FormError, FormSuccess } from "../AuthFormMessage";
 
 import AuthCard from "../AuthWrapper";
 import { Loader2 } from "lucide-react";
 import { registerNewAccount } from "../../../API";
+import { AuthSubmitButton } from "../Auth.styles";
+import { TrackGoogleAnalyticsEvent } from "../../../lib/GoogleAnalyticsUtil";
+import { useNavigate } from "react-router-dom";
 
 const SignUpSchema = z
   .object({
     email: z.string().min(1, "Email is required").email("Invalid email"),
     name: z.string().min(1, "Username is required").max(100),
-    organisation: z.string().min(1, "Organisation is required").max(100),
+    organisation: z.optional(z.string()),
     password: z
       .string()
       .min(1, "Password is required")
@@ -43,7 +46,7 @@ const SignUpForm = () => {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
+  const navigate = useNavigate();
   const form = useForm({
     resolver: zodResolver(SignUpSchema),
     defaultValues: {
@@ -59,11 +62,22 @@ const SignUpForm = () => {
     setError("");
     setSuccess("");
     setPending(true);
+    TrackGoogleAnalyticsEvent(
+      "Form Submission",
+      "Submitted Sign Up Form",
+      "Sign Up Button"
+    );
 
     await registerNewAccount(values)
       .then((data) => {
         if (data?.success) {
           setSuccess(data?.success);
+          TrackGoogleAnalyticsEvent(
+            "Form Submission",
+            "New User Created",
+            "Sign Up Button"
+          );
+          navigate("/login");
         }
 
         if (data?.error) {
@@ -117,7 +131,7 @@ const SignUpForm = () => {
                   <Input
                     placeholder="Enter a username"
                     {...field}
-                    disabled={pending}  
+                    disabled={pending}
                   />
                 </FormControl>
                 <FormMessage />
@@ -135,7 +149,7 @@ const SignUpForm = () => {
                   <Input
                     placeholder="Enter your organization "
                     {...field}
-                    disabled={pending} 
+                    disabled={pending}
                   />
                 </FormControl>
                 <FormMessage />
@@ -181,12 +195,9 @@ const SignUpForm = () => {
             )}
           />
 
-          <button
-            className="w-full h-12 outline-none flex items-center justify-center rounded-md text-base font-semibold mb-7 border-2 border-transparent bg-sunbird-orange text-white hover:bg-opacity-90 transition-all ease-out duration-[0.3s]"
-            disabled={pending}
-          >
+          <AuthSubmitButton type="submit" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : "Sign Up"}
-          </button>
+          </AuthSubmitButton>
         </form>
       </Form>
     </AuthCard>

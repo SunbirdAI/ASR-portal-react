@@ -16,7 +16,7 @@ const AuthCard = ({ children, headerLabel, messageLabel, backref, backrefDescrip
 
         <AuthFooter>
           <AuthFooterDescription>{backrefDescription}</AuthFooterDescription>
-          <NavLink to={backref} className='text-sm font-medium hover:underline hover:text-sunbird-orange ease-out duration-[0.3s]'>
+          <NavLink to={backref} className='text-sm font-medium hover:underline hover:opacity-90 text-sunbird-orange ease-out duration-[0.3s]'>
             {backrefMessage}
           </NavLink>
         </AuthFooter>

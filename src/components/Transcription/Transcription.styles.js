@@ -68,3 +68,31 @@ export const AudioPlayerContainer = styled.div`
 export const DynamicMainContainer = styled(MainContainer)`
   padding-bottom: ${props => props.hasFooter ? '100px' : '0'};
 `;
+
+export const Note = styled.div`
+  ${tw`
+    flex
+    p-1
+    w-full
+    items-center
+    bg-gray-100 shadow
+    text-gray-700
+    rounded-md
+    mb-4
+    justify-between
+    relative
+  `}
+`;
+
+export const CloseButton = styled.button`
+  ${tw`
+    absolute
+    top-2
+    right-2
+    bg-transparent
+    border-none
+    text-yellow-800
+    cursor-pointer
+    text-lg
+  `}
+`;

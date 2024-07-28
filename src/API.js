@@ -123,35 +123,32 @@ export async function updateTranscript(id, transcript) {
 }
 export const registerNewAccount = async (values) => {
 	let data = {};
-	const formData = new FormData();
-	formData.append('email', values.email);
-	formData.append('username', values.name);
-	formData.append('organization', values.organisation);
-	formData.append('password', values.password);
-	formData.append('confirm_password', values.confirmPassword);
 
 	try {
 		const response = await fetch(
-			`${process.env.REACT_APP_SB_API_URL}/register`,
+			`${process.env.REACT_APP_SB_API_URL}/auth/register`,
 			{
 				method: 'POST',
 				headers: {
-					Accept: 'text/html',
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
 				},
-				body: formData,
+				body: JSON.stringify({
+					username: values.name,
+					email: values.email,
+					organization: values.organisation,
+					password: values.password,
+					account_type: 'Free',
+				}),
 			}
 		);
 
-		if (response.redirected) {
-			// Extract the alert message from the redirect URL if available
-			const urlParams = new URLSearchParams(new URL(response.url).search);
-			const alertMessage = urlParams.get('alert');
-			data.success = alertMessage || 'Your account has been created';
-		} else {
-			const responseText = await response.text();
-			const errorMessage = extractErrorMessageFromHTML(responseText);
-			data.error = errorMessage || 'Something went wrong';
-			console.log('message', errorMessage);
+		const responseBody = await response.json();
+		if (response.status === 400) {
+			data.error = responseBody.detail || 'Invalid username or email';
+		} else if (response.status === 201) {
+			data.success = 'Account succressfully created';
+			console.log('message', responseBody);
 		}
 	} catch (error) {
 		data.error = 'Something went wrong';
@@ -194,13 +191,6 @@ export const loginIntoAccount = async (values) => {
 	return data;
 };
 
-const extractErrorMessageFromHTML = (html) => {
-	const parser = new DOMParser();
-	const doc = parser.parseFromString(html, 'text/html');
-	const errorElement = doc.querySelector('p.text-red-500');
-	return errorElement ? errorElement.textContent : null;
-};
-
 export const sendFeedback = async (
 	feedback,
 	CorrectTranslation,
@@ -227,96 +217,4 @@ export const sendFeedback = async (
 	};
 	const response = await (await fetch(FEEDBACK_URL, requestOptions)).json();
 	return response;
-};
-
-export const forgotPassword = async (values) => {
-	const data = {
-		email: values.email,
-	};
-	//formData.append('email', values.email);
-	try {
-		const response = await fetch(
-			`${process.env.REACT_APP_SB_API_URL}/auth/forgot-password`,
-			{
-				method: 'POST',
-				headers: {
-					Accept: 'application/json',
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			}
-		);
-
-		const responseBody = await response.json();
-		console.log(`Response: ${response.ok} Status code: ${response.status}`);
-
-		if (!response.ok) {
-			throw new Error(`HTTP error! status: ${response.status}`);
-		}
-		return responseBody;
-	} catch (error) {
-		console.error('Error occurred during password reset:', error);
-		throw error;
-	}
-};
-
-export const resetPassword = async (values) => {
-	const data = {
-		token: values.token,
-		new_password: values.password,
-	};
-	try {
-		const response = await fetch(
-			`${process.env.REACT_APP_SB_API_URL}/auth/reset-password`,
-			{
-				method: 'POST',
-				headers: {
-					Accept: 'application/json',
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			}
-		);
-		const responseBody = await response.json();
-		console.log(`Response: ${response.ok} Status code: ${response.status}`);
-
-		if (!response.ok) {
-			throw new Error(`HTTP error! status: ${response.status}`);
-		}
-		return responseBody;
-	} catch (error) {
-		console.error('Error occurred during password reset:', error);
-		throw error;
-	}
-};
-
-export const changePassword = async (values) => {
-	const data = {
-		old_password: values.oldPassword,
-		new_password: values.newPassword,
-	};
-	try {
-		const response = await fetch(
-			`${process.env.REACT_APP_SB_API_URL}/auth/change-password`,
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${token}`,
-					Accept: 'application/json',
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(data),
-			}
-		);
-		const responseBody = await response.json();
-		console.log(`Response: ${response.ok} Status code: ${response.status}`);
-
-		if (!response.ok) {
-			throw new Error(`HTTP error! status: ${response.status}`);
-		}
-		return responseBody;
-	} catch (error) {
-		console.error('Error occurred during password change:', error);
-		throw error;
-	}
 };

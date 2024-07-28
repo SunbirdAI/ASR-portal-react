@@ -1,9 +1,7 @@
 import React from "react";
-import "react/jsx-runtime";
 import { Slot } from "@radix-ui/react-slot";
 import { Controller, FormProvider, useFormContext } from "react-hook-form";
-
-import { cn } from "../../lib/utils";
+import { cn } from "../lib/utils";
 import { Label } from "./Labels";
 
 const Form = FormProvider;
@@ -28,7 +26,7 @@ const useFormField = () => {
     throw new Error("useFormField should be used within <FormField>");
   }
 
-  const id = React.useId()
+  const id = React.useId();
 
   return {
     id,
