@@ -25,6 +25,7 @@ export async function recognizeSpeech(audioData, languageCode, adapterCode) {
   formData.append("audio", audioData); // You might need to adjust the filename.
   formData.append("language", languageCode);
   formData.append("adapter", adapterCode);
+  formData.append("whisper", true);
 
   try {
     const response = await fetch(asrUrl, {
