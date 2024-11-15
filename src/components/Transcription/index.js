@@ -56,7 +56,6 @@ const Transcription = () => {
   const [feedback, setFeedback] = useState(""); // Feedback comments
   const [rating, setRating] = useState(0); // Rating for transcription accuracy
   const [transcriptionID, setTranscriptionID] = useState(null); // Store transcription ID
-  const [userFeedback, setUserFeedback] = useState("");
 
   const copyToClipboard = async () => {
     try {
@@ -110,29 +109,29 @@ const Transcription = () => {
     if (!textOutput || !transcriptionID) return;
 
     console.log("feed back sent.")
+    console.log("Comment: "+ rating)
 
-
-    if (rating >= 4)
-      setUserFeedback("Good")
-    else
-      setUserFeedback("Bad")
+    const feedbackValue = rating >= 4 ? "Good" : "Bad";
     
-    const feedbackData = {
-      userFeedback,
-      username: "ASR_USER",
-      sourceText: "", 
-      transcription: textOutput,
-      audio_url: audioSrc,
-      transcriptionID,
-      from: language,
-      to: language,
-      comment: feedback,
-    };
+    console.log("User feed back: "+ feedbackValue)
+    console.log("Comment: "+ feedback)
 
-    console.log("Feed back data: " + feedbackData.audio_url)
+    // const feedbackData = {
+    //   userFeedback,
+    //   username: "ASR_USER",
+    //   sourceText: "", 
+    //   transcription: textOutput,
+    //   audio_url: audioSrc,
+    //   transcriptionID,
+    //   from: language,
+    //   to: language,
+    //   comment: feedback,
+    // };
+
+    // console.log("Feed back data: " + feedbackData.audio_url)
 
     setIsLoading(true);
-    const response = sendFeedback(userFeedback,"ASR_USER",language,textOutput,audioSrc,transcriptionID,feedback).catch((e) => console.error('Feedback error:', e));
+    const response = sendFeedback(feedbackValue,"ASR_USER",language,textOutput,audioSrc,transcriptionID,feedback).catch((e) => console.error('Feedback error:', e));
 
     // console.log("Feed back response: " + response)
 
