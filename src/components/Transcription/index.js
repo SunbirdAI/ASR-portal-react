@@ -6,11 +6,15 @@ import {
   ButtonContainer,
   Note,
   CloseButton,
+  FeedbackContainer,
+  RatingStars,
+  FeedbackTextarea,
+  SubmitFeedbackButton,
 } from "./Transcription.styles";
-import AudioInput from "../AudioInput"; // Adjust based on actual file structure
+import AudioInput from "../AudioInput";
 import TranscriptionTextArea from "../TranscriptionTextArea";
 import Button from "@mui/material/Button";
-import { recognizeSpeech } from "../../API"; // Function to convert speech to text
+import { recognizeSpeech, sendFeedback } from "../../API";
 import Footer from "../Footer";
 import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
 
@@ -42,13 +46,17 @@ const sourceOptions = [
 ];
 
 const Transcription = () => {
-  const [language, setLanguage] = useState("lug"); // Default language for speech recognition
-  const [textOutput, setTextOutput] = useState(""); // The recognized text from speech
-  const [isLoading, setIsLoading] = useState(false); // Loading state for async operations
-  const [audioSrc, setAudioSrc] = useState(""); // Store the audio source URL or blob
-  const [audioData, setAudioData] = useState(null); // Store the audio data blob
+  const [language, setLanguage] = useState("lug");
+  const [textOutput, setTextOutput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [audioSrc, setAudioSrc] = useState("");
+  const [audioData, setAudioData] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showNote, setShowNote] = useState(true);
+  const [feedback, setFeedback] = useState(""); // Feedback comments
+  const [rating, setRating] = useState(0); // Rating for transcription accuracy
+  const [transcriptionID, setTranscriptionID] = useState(null); // Store transcription ID
+  const [userFeedback, setUserFeedback] = useState("");
 
   const copyToClipboard = async () => {
     try {
@@ -60,7 +68,6 @@ const Transcription = () => {
     }
   };
 
-  // Handles the submission of audio data for recognition
   const handleAudioSubmit = useCallback(async () => {
     if (!audioData) return;
 
@@ -71,10 +78,8 @@ const Transcription = () => {
     );
     setIsLoading(true);
     try {
-      const transcript = await recognizeSpeech(audioData, language, language); // Process the audio to text
-      console.log("Transcription: " + transcript);
-      console.log("Language: " + language);
-      setAudioSrc(URL.createObjectURL(audioData)); // Assuming audioData is a Blob
+      const transcript = await recognizeSpeech(audioData, language, language);
+      setAudioSrc(URL.createObjectURL(audioData));
 
       if (transcript.audio_transcription) {
         TrackGoogleAnalyticsEvent(
@@ -82,6 +87,7 @@ const Transcription = () => {
           "Transcription Successful",
           "Transcribe Button"
         );
+        setTranscriptionID(transcript.audio_transcription_id); // Store transcription ID
       }
       setTextOutput(transcript.audio_transcription);
     } catch (e) {
@@ -100,21 +106,46 @@ const Transcription = () => {
     setLanguage(event.target.value);
   };
 
-  useEffect(() => {
-    console.log("Language updated to: " + language);
-  }, [language]);
+  const handleFeedbackSubmit = async () => {
+    if (!textOutput || !transcriptionID) return;
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowNote(false);
-    }, 6000); // Hide the note after 10 seconds
+    console.log("feed back sent.")
 
-    return () => clearTimeout(timer);
-  }, []);
+
+    if (rating >= 4)
+      setUserFeedback("Good")
+    else
+      setUserFeedback("Bad")
+    
+    const feedbackData = {
+      userFeedback,
+      username: "ASR_USER",
+      sourceText: "", 
+      transcription: textOutput,
+      audio_url: audioSrc,
+      transcriptionID,
+      from: language,
+      to: language,
+      comment: feedback,
+    };
+
+    console.log("Feed back data: " + feedbackData.audio_url)
+
+    setIsLoading(true);
+    const response = sendFeedback(userFeedback,"ASR_USER",language,textOutput,audioSrc,transcriptionID,feedback).catch((e) => console.error('Feedback error:', e));
+
+    // console.log("Feed back response: " + response)
+
+    setIsLoading(false);
+    if (response) {
+      alert("Thank you for your feedback!");
+      setFeedback("");
+      setRating(0);
+    }
+  };
 
   return (
     <>
-
       {showNote && (
         <div>
           <Note>
@@ -163,7 +194,41 @@ const Transcription = () => {
             text={textOutput}
             copyToClipboard={copyToClipboard}
             copySuccess={copySuccess}
-          ></Footer>
+          />
+        )}
+
+        {/* Feedback Section */}
+        {textOutput && (
+          <FeedbackContainer>
+            <h3>Feedback</h3>
+            <p>Rate the transcription accuracy:</p>
+            <RatingStars>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <span
+                  key={star}
+                  onClick={() => setRating(star)}
+                  style={{ cursor: "pointer", color: star <= rating ? "gold" : "gray" }}
+                >
+                  ★
+                </span>
+              ))}
+            </RatingStars>
+            <FeedbackTextarea
+              placeholder="Any comments on the transcription?"
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+            />
+            <ButtonContainer>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleFeedbackSubmit}
+                disabled={isLoading}
+              >
+                Submit Feedback
+              </Button>
+            </ButtonContainer>
+          </FeedbackContainer>
         )}
       </DynamicMainContainer>
     </>

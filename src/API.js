@@ -42,6 +42,7 @@ export async function recognizeSpeech(audioData, languageCode, adapterCode) {
     }
 
     const data = await response.json();
+    console.log(data);
     return data;
   } catch (error) {
     console.error("Error recognizing speech:", error);
@@ -193,12 +194,12 @@ export const loginIntoAccount = async (values) => {
 
 export const sendFeedback = async (
   feedback,
-  CorrectTranslation,
   username,
-  sourceText,
-  translation,
-  from,
-  to
+  language,
+  transcription = null,
+  audio_url = null,
+  transcriptionID = null,
+  comment
 ) => {
   const time = Date.now();
   const requestOptions = {
@@ -206,15 +207,23 @@ export const sendFeedback = async (
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       Timestamp: time,
-      feedback: feedback,
-      SourceText: sourceText,
-      LanguageFrom: from,
-      LanguageTo: to,
-      username: username,
-      CorrectTranslation: CorrectTranslation,
-      TranslatedText: translation,
+      feedback,
+      Language: language,
+      username,
+      TranscriptionText: transcription,
+      AudioURL: audio_url,
+      TranscriptionID: transcriptionID,
+      Comment: comment,
+      FeedBackType: "ASRPortal",
     }),
   };
-  const response = await (await fetch(FEEDBACK_URL, requestOptions)).json();
-  return response;
+
+  try {
+    const response = await fetch(FEEDBACK_URL, requestOptions);
+    return await response.json();
+  } catch (err) {
+    console.error(err);
+    return null;
+  }
 };
+
