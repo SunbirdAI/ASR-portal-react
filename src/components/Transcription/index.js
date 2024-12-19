@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   DynamicMainContainer,
   LanguageDropdown,
@@ -9,7 +9,6 @@ import {
   FeedbackContainer,
   RatingStars,
   FeedbackTextarea,
-  SubmitFeedbackButton,
 } from "./Transcription.styles";
 import AudioInput from "../AudioInput";
 import TranscriptionTextArea from "../TranscriptionTextArea";
@@ -42,6 +41,22 @@ const sourceOptions = [
   {
     label: "English",
     value: "eng",
+  },
+  {
+    label: "Swahili",
+    value: "swa",
+  },
+  {
+    label: "Kinyarwanda",
+    value: "kin",
+  },
+  {
+    label: "Lusoga",
+    value: "xog",
+  },
+  {
+    label: "Lumasaba",
+    value: "myx",
   },
 ];
 
@@ -108,18 +123,18 @@ const Transcription = () => {
   const handleFeedbackSubmit = async () => {
     if (!textOutput || !transcriptionID) return;
 
-    console.log("feed back sent.")
-    console.log("Comment: "+ rating)
+    console.log("feed back sent.");
+    console.log("Comment: " + rating);
 
     const feedbackValue = rating >= 4 ? "Good" : "Bad";
-    
-    console.log("User feed back: "+ feedbackValue)
-    console.log("Comment: "+ feedback)
+
+    console.log("User feed back: " + feedbackValue);
+    console.log("Comment: " + feedback);
 
     // const feedbackData = {
     //   userFeedback,
     //   username: "ASR_USER",
-    //   sourceText: "", 
+    //   sourceText: "",
     //   transcription: textOutput,
     //   audio_url: audioSrc,
     //   transcriptionID,
@@ -131,7 +146,15 @@ const Transcription = () => {
     // console.log("Feed back data: " + feedbackData.audio_url)
 
     setIsLoading(true);
-    const response = sendFeedback(feedbackValue,"ASR_USER",language,textOutput,audioSrc,transcriptionID,feedback).catch((e) => console.error('Feedback error:', e));
+    const response = sendFeedback(
+      feedbackValue,
+      "ASR_USER",
+      language,
+      textOutput,
+      audioSrc,
+      transcriptionID,
+      feedback
+    ).catch((e) => console.error("Feedback error:", e));
 
     // console.log("Feed back response: " + response)
 
@@ -148,7 +171,8 @@ const Transcription = () => {
       {showNote && (
         <div>
           <Note>
-            Note: Audio files used here are saved for the purpose of system improvement and model retraining.
+            Note: Audio files used here are saved for the purpose of system
+            improvement and model retraining.
             <CloseButton onClick={() => setShowNote(false)}>✖</CloseButton>
           </Note>
         </div>
@@ -206,7 +230,10 @@ const Transcription = () => {
                 <span
                   key={star}
                   onClick={() => setRating(star)}
-                  style={{ cursor: "pointer", color: star <= rating ? "gold" : "gray" }}
+                  style={{
+                    cursor: "pointer",
+                    color: star <= rating ? "gold" : "gray",
+                  }}
                 >
                   ★
                 </span>

@@ -1,0 +1,36 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - run: npm ci
+      - run: npm install --save-dev @babel/plugin-proposal-private-property-in-object
+      - run: npm run build --if-present
+
+      - name: Deploy with gh-pages
+        run: |
+          git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+          npm run deploy -- -u "github-actions-bot <support+actions@github.com>"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REACT_APP_SB_API_URL: ${{ secrets.REACT_APP_SB_API_URL }}
+          REACT_APP_SB_API_TOKEN: ${{ secrets.REACT_APP_SB_API_TOKEN }}
+          REACT_APP_GA4_TRACKING_ID: ${{ secrets.REACT_APP_GA4_TRACKING_ID }}
+          REACT_APP_GA4_MEASUREMENT_ID: ${{ secrets.REACT_APP_GA4_MEASUREMENT_ID }}
+          REACT_APP_FEEDBACK_URL: ${{ secrets.REACT_APP_FEEDBACK_URL }}
