@@ -3,7 +3,7 @@ import "./App.css";
 import { Wrapper } from "./GlobalStyles";
 import Header from "./components/Header";
 import Transcription from "./components/Transcription";
-import { useEffect } from "react";
+import  React,{ useEffect } from "react";
 //import { tracking_id } from "./API";
 import {
   HashRouter as Router,
@@ -18,7 +18,7 @@ import SignInForm from "./components/Auth/SignIn";
 
 const usePageViews = (location) => {
   useEffect(() => {
-    if (process.env.REACT_APP_NODE_ENV === "Production") {
+    if (import.meta.env.MODE === "Production") {
       ReactGA.send({
         hitType: "pageview",
         page: location.pathname + location.hash + location.search,

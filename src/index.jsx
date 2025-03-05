@@ -1,5 +1,5 @@
 import React from "react";
-import { createRoot } from "react-dom/client";
+import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
@@ -11,10 +11,13 @@ const hotjarVersion = 6;
 
 Hotjar.init(siteId, hotjarVersion);
 
-const root = createRoot(document.getElementById("root"));
+// Create root once
+const root = ReactDOM.createRoot(
+  document.getElementById("root") 
+);
 
-if (process.env.REACT_APP_NODE_ENV === "Production") {
-  ReactGA.initialize(`${process.env.REACT_APP_GA4_MEASUREMENT_ID}`, {
+if (import.meta.env.MODE === "Production") {
+  ReactGA.initialize(`${import.meta.env.VITE_GA4_MEASUREMENT_ID}`, {
     gaOptions: {
       anonymizeIp: true,
     },

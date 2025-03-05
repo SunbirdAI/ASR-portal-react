@@ -1,3 +1,4 @@
+import React from "react"
 import { Nav, Title, Logo } from "./Header.styles";
 import { Dropdown } from "../DropDown";
 import img from "../../images/logo.png";
