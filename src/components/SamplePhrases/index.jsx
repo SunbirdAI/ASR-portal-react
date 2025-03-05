@@ -1,3 +1,4 @@
+import React from "react"
 import {PhraseList, PhraseListItem, SamplePhrasesAccordion} from "./SamplePhrases.styles";
 import {Accordion, AccordionSummary, AccordionDetails} from '@mui/material';
 import {Tabs, Tab} from "@mui/material";

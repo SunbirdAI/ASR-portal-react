@@ -1,15 +1,15 @@
 // import pRetry from "p-retry";
 
-const FEEDBACK_URL = process.env.REACT_APP_FEEDBACK_URL;
-// const HUGGING_FACE_API_KEY = process.env.REACT_APP_HUGGING_FACE_API_KEY;
-export const tracking_id = process.env.REACT_APP_GA4_TRACKING_ID;
+const FEEDBACK_URL = import.meta.env.VITE_FEEDBACK_URL;
+// const HUGGING_FACE_API_KEY = import.meta.env.VITE_HUGGING_FACE_API_KEY;
+export const tracking_id = import.meta.env.VITE_GA4_TRACKING_ID;
 export const token = localStorage.getItem("access_token")
   ? localStorage.getItem("access_token")
-  : process.env.REACT_APP_SB_API_TOKEN;
+  : import.meta.env.VITE_SB_API_TOKEN;
 
-const asrUrl = `${process.env.REACT_APP_SB_API_URL}/tasks/stt`;
+const asrUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/stt`;
 
-const asrDbUrl = `${process.env.REACT_APP_SB_API_URL}/transcriptions`;
+const asrDbUrl = `${import.meta.env.VITE_SB_API_URL}/transcriptions`;
 
 // const textToSpeechUrl = "https://api-inference.huggingface.co/models/Sunbird/sunbird-lug-tts";
 
@@ -127,7 +127,7 @@ export const registerNewAccount = async (values) => {
 
   try {
     const response = await fetch(
-      `${process.env.REACT_APP_SB_API_URL}/auth/register`,
+      `${import.meta.env.VITE_SB_API_URL}/auth/register`,
       {
         method: "POST",
         headers: {
@@ -167,7 +167,7 @@ export const loginIntoAccount = async (values) => {
 
   try {
     const response = await fetch(
-      `${process.env.REACT_APP_SB_API_URL}/auth/token`,
+      `${import.meta.env.VITE_SB_API_URL}/auth/token`,
       {
         method: "POST",
         headers: {
