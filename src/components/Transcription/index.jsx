@@ -1,21 +1,21 @@
-import React, { useState, useCallback } from "react";
-import {
-  DynamicMainContainer,
-  LanguageDropdown,
-  ResponsiveContainer,
-  ButtonContainer,
-  Note,
-  CloseButton,
-  FeedbackContainer,
-  RatingStars,
-  FeedbackTextarea,
-} from "./Transcription.styles";
-import AudioInput from "../AudioInput";
-import TranscriptionTextArea from "../TranscriptionTextArea";
 import Button from "@mui/material/Button";
+import { useCallback, useState } from "react";
 import { recognizeSpeech, sendFeedback } from "../../API";
-import Footer from "../Footer";
 import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
+import AudioInput from "../AudioInput";
+import Footer from "../Footer";
+import TranscriptionTextArea from "../TranscriptionTextArea";
+import {
+  ButtonContainer,
+  CloseButton,
+  DynamicMainContainer,
+  FeedbackContainer,
+  FeedbackTextarea,
+  LanguageDropdown,
+  Note,
+  RatingStars,
+  ResponsiveContainer,
+} from "./Transcription.styles";
 
 const sourceOptions = [
   {
@@ -83,6 +83,7 @@ const Transcription = () => {
   };
 
   const handleAudioSubmit = useCallback(async () => {
+    console.log("audioData", audioData);
     if (!audioData) return;
 
     TrackGoogleAnalyticsEvent(
