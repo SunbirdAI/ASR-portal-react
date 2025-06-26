@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
 import Button from "@mui/material/Button";
 import SvgIcon from "@mui/material/SvgIcon";
+import { useEffect, useState } from "react";
 import { TailSpin } from "react-loader-spinner";
 import Swal from "sweetalert2";
 import {
   Container,
   DropZoneContainer,
-  RecordingArea,
   LoadingContainer,
+  RecordingArea,
   VerticalDottedLine,
 } from "./AudioInput.styles";
 
@@ -64,7 +64,11 @@ const AudioInput = ({ onAudioSubmit, isLoading }) => {
   useEffect(() => {
     if (!recording && audioData.length > 0) {
       const audioBlob = new Blob(audioData, { type: "audio/wav" });
-      onAudioSubmit(audioBlob);
+      // Create a File object with proper name and extension
+      const audioFile = new File([audioBlob], `recording_${Date.now()}.wav`, {
+        type: "audio/wav",
+      });
+      onAudioSubmit(audioFile);
     }
   }, [recording, audioData, onAudioSubmit]);
 
