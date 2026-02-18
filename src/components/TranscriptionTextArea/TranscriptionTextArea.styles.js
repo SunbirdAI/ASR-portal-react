@@ -1,27 +1,36 @@
 import tw, { styled } from "twin.macro";
 
+export const TextAreaShell = styled.div`
+  ${tw`w-full rounded-2xl p-3 md:p-4`}
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--color-elev-shadow);
+`;
+
 export const TextArea = styled.textarea`
    ${tw`
     w-full
-    h-full
-    relative
-    p-4  // Smaller base padding
-    text-gray-700
-    rounded
+    h-72
+    p-4
+    text-black
     transition
-    shadow-lg
-    rounded-lg
-    focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none
+    rounded-xl
+    focus:text-black
+    focus:bg-white
+    focus:outline-none
+    resize-none
   `}
-
-  font-size: 16px; // Base font size for larger screens
-  @media (max-width: 768px) {
-    font-size: 14px; // Smaller font size for tablets
-    padding: 3rem;  // Slightly smaller padding
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 15px;
+  line-height: 1.65;
+  &:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+    background: var(--color-accent-soft);
   }
-  @media (max-width: 480px) {
-    font-size: 12px; // Even smaller font size for mobile phones
-    padding: 2rem;  // Minimal padding to increase space
-    height: 200px; // Fixed smaller height for very small devices
+  @media (max-width: 768px) {
+    min-height: 230px;
   }
 `;

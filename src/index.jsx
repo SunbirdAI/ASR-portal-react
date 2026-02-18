@@ -5,11 +5,13 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import ReactGA from "react-ga4";
 import Hotjar from '@hotjar/browser';
+import { initializeTheme } from "./lib/theme";
 
 const siteId = 5091559;
 const hotjarVersion = 6;
 
 Hotjar.init(siteId, hotjarVersion);
+initializeTheme();
 
 // Create root once
 const root = ReactDOM.createRoot(

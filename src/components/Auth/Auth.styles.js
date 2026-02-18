@@ -23,11 +23,12 @@ export const AuthDiv = styled.div`
     px-12 
     rounded-xl
     bg-white 
-    border 
-    border-opacity-[0.61] 
+    border
     z-30   
     my-4
   `}
+  border-color: #e5e5e3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 `;
 export const AuthHeading = styled.div`
   ${tw`
@@ -64,6 +65,7 @@ export const AuthFormMessage = styled.div`
 `;
 export const AuthSubmitButton = styled.button`
   ${tw`
-  w-full h-12 outline-none flex items-center justify-center rounded-md text-base font-semibold mb-7 border-2 border-transparent bg-sunbird-orange text-white hover:bg-opacity-90 transition-all ease-out duration-[0.3s] disabled:opacity-50       
+  w-full h-12 outline-none flex items-center justify-center rounded-full text-base font-semibold mb-7 border bg-white text-sunbird-orange hover:bg-[#FFF8EF] transition-all ease-out duration-[0.3s] disabled:opacity-50       
   `}
+  border-color: #d97706;
 `;

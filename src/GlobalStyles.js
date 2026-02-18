@@ -2,14 +2,14 @@ import tw, {styled} from 'twin.macro';
 
 export const Wrapper = styled.div`
   ${tw`
-    grid
-    grid-cols-1
-    h-5/6
-    mx-5
-    my-3
-    md:mx-16
-    md:my-5
-    lg:mx-20
-    lg:my-10
+    w-full
+    mx-auto
+    px-4
+    pt-6
+    pb-8
+    md:px-8
+    lg:px-10
    `}
+  max-width: 1200px;
+  min-height: calc(100vh - 88px);
 `;

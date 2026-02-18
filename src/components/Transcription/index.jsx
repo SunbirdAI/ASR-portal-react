@@ -1,264 +1,86 @@
-import Button from "@mui/material/Button";
-import { useCallback, useState } from "react";
-import { recognizeSpeech, sendFeedback } from "../../API";
-import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
-import AudioInput from "../AudioInput";
-import Footer from "../Footer";
-import TranscriptionTextArea from "../TranscriptionTextArea";
+import { useMemo, useState } from "react";
+import SpeechToText from "../SpeechToText";
+import TextToSpeech from "../TextToSpeech";
 import {
-  ButtonContainer,
-  CloseButton,
-  DynamicMainContainer,
-  FeedbackContainer,
-  FeedbackTextarea,
-  LanguageDropdown,
-  Note,
-  RatingStars,
-  ResponsiveContainer,
+  ModeContent,
+  ModeDescription,
+  ModeHeader,
+  ModeShell,
+  ModeTab,
+  ModeTabs,
+  ModeTitle,
 } from "./Transcription.styles";
 
-const sourceOptions = [
+const MODE_CONFIG = [
   {
-    label: "Luganda",
-    value: "lug",
+    id: "stt",
+    label: "Speech to Text",
+    description: "Convert audio recordings into editable text.",
   },
   {
-    label: "Acholi",
-    value: "ach",
-  },
-  {
-    label: "Ateso",
-    value: "teo",
-  },
-  {
-    label: "Lugbara",
-    value: "lgg",
-  },
-  {
-    label: "Runyankole",
-    value: "nyn",
-  },
-  {
-    label: "English",
-    value: "eng",
-  },
-  {
-    label: "Swahili",
-    value: "swa",
-  },
-  {
-    label: "Kinyarwanda",
-    value: "kin",
-  },
-  {
-    label: "Lusoga",
-    value: "xog",
-  },
-  {
-    label: "Lumasaba",
-    value: "myx",
+    id: "tts",
+    label: "Text to Speech",
+    description: "Generate natural speech audio from written text.",
   },
 ];
 
 const Transcription = () => {
-  const [language, setLanguage] = useState("lug");
-  const [textOutput, setTextOutput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [audioSrc, setAudioSrc] = useState("");
-  const [audioData, setAudioData] = useState(null);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [showNote, setShowNote] = useState(true);
-  const [feedback, setFeedback] = useState(""); // Feedback comments
-  const [rating, setRating] = useState(0); // Rating for transcription accuracy
-  const [transcriptionID, setTranscriptionID] = useState(null); // Store transcription ID
+  const [activeMode, setActiveMode] = useState("stt");
 
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(textOutput);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 3000);
-    } catch (err) {
-      console.error("Failed to copy!", err);
+  const activeModeConfig = useMemo(
+    () => MODE_CONFIG.find((mode) => mode.id === activeMode),
+    [activeMode]
+  );
+
+  const handleTabKeyDown = (event) => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") {
+      return;
     }
-  };
+    event.preventDefault();
 
-  const handleAudioSubmit = useCallback(async () => {
-    console.log("audioData", audioData);
-    if (!audioData) return;
+    const currentIndex = MODE_CONFIG.findIndex((mode) => mode.id === activeMode);
+    const nextIndex =
+      event.key === "ArrowRight"
+        ? (currentIndex + 1) % MODE_CONFIG.length
+        : (currentIndex - 1 + MODE_CONFIG.length) % MODE_CONFIG.length;
 
-    TrackGoogleAnalyticsEvent(
-      "Transcriptions",
-      "Transcription Requested",
-      "Transcribe Button"
-    );
-    setIsLoading(true);
-    try {
-      const transcript = await recognizeSpeech(audioData, language, language);
-      setAudioSrc(URL.createObjectURL(audioData));
-
-      if (transcript.audio_transcription) {
-        TrackGoogleAnalyticsEvent(
-          "Transcriptions",
-          "Transcription Successful",
-          "Transcribe Button"
-        );
-        setTranscriptionID(transcript.audio_transcription_id); // Store transcription ID
-      }
-      setTextOutput(transcript.audio_transcription);
-    } catch (e) {
-      console.log(e);
-      setTextOutput("");
-    }
-    setIsLoading(false);
-  }, [audioData, language]);
-
-  const handleAudioLoad = useCallback((audioData) => {
-    setAudioData(audioData);
-    setAudioSrc(URL.createObjectURL(audioData));
-  }, []);
-
-  const onLanguageChange = (event) => {
-    setLanguage(event.target.value);
-  };
-
-  const handleFeedbackSubmit = async () => {
-    if (!textOutput || !transcriptionID) return;
-
-    console.log("feed back sent.");
-    console.log("Comment: " + rating);
-
-    const feedbackValue = rating >= 4 ? "Good" : "Bad";
-
-    console.log("User feed back: " + feedbackValue);
-    console.log("Comment: " + feedback);
-
-    // const feedbackData = {
-    //   userFeedback,
-    //   username: "ASR_USER",
-    //   sourceText: "",
-    //   transcription: textOutput,
-    //   audio_url: audioSrc,
-    //   transcriptionID,
-    //   from: language,
-    //   to: language,
-    //   comment: feedback,
-    // };
-
-    // console.log("Feed back data: " + feedbackData.audio_url)
-
-    setIsLoading(true);
-    const response = sendFeedback(
-      feedbackValue,
-      "ASR_USER",
-      language,
-      textOutput,
-      audioSrc,
-      transcriptionID,
-      feedback
-    ).catch((e) => console.error("Feedback error:", e));
-
-    // console.log("Feed back response: " + response)
-
-    setIsLoading(false);
-    if (response) {
-      alert("Thank you for your feedback!");
-      setFeedback("");
-      setRating(0);
-    }
+    setActiveMode(MODE_CONFIG[nextIndex].id);
   };
 
   return (
-    <>
-      {showNote && (
-        <div>
-          <Note>
-            Note: Audio files used here are saved for the purpose of system
-            improvement and model retraining.
-            <CloseButton onClick={() => setShowNote(false)}>✖</CloseButton>
-          </Note>
-        </div>
-      )}
+    <ModeShell>
+      <ModeHeader>
+        <ModeTitle>Speech Studio</ModeTitle>
+        <ModeDescription>{activeModeConfig?.description}</ModeDescription>
+      </ModeHeader>
 
-      <DynamicMainContainer hasFooter={!!audioData}>
-        <ResponsiveContainer>
-          <h3>Step 1: Upload or Record Your Audio</h3>
-          <AudioInput onAudioSubmit={handleAudioLoad} isLoading={isLoading} />
+      <ModeTabs role="tablist" aria-label="Speech tools">
+        {MODE_CONFIG.map((mode) => (
+          <ModeTab
+            key={mode.id}
+            id={`tab-${mode.id}`}
+            role="tab"
+            type="button"
+            tabIndex={activeMode === mode.id ? 0 : -1}
+            aria-selected={activeMode === mode.id}
+            aria-controls={`panel-${mode.id}`}
+            active={activeMode === mode.id}
+            onClick={() => setActiveMode(mode.id)}
+            onKeyDown={handleTabKeyDown}
+          >
+            {mode.label}
+          </ModeTab>
+        ))}
+      </ModeTabs>
 
-          <h3>Step 2: Select the Language of the Audio</h3>
-          <LanguageDropdown onChange={onLanguageChange}>
-            {sourceOptions.map((option, index) => (
-              <option key={index} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </LanguageDropdown>
-
-          <h3>Step 3: Transcribe the Audio</h3>
-          <ButtonContainer>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleAudioSubmit}
-              disabled={!audioData || isLoading}
-            >
-              Transcribe
-            </Button>
-          </ButtonContainer>
-        </ResponsiveContainer>
-
-        <TranscriptionTextArea
-          placeholder="Recognized text will appear here"
-          text={textOutput}
-          setText={setTextOutput}
-          isLoading={isLoading}
-        />
-        {audioData && (
-          <Footer
-            audioSrc={audioSrc}
-            text={textOutput}
-            copyToClipboard={copyToClipboard}
-            copySuccess={copySuccess}
-          />
-        )}
-
-        {/* Feedback Section */}
-        {textOutput && (
-          <FeedbackContainer>
-            <h3>Feedback</h3>
-            <p>Rate the transcription accuracy:</p>
-            <RatingStars>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <span
-                  key={star}
-                  onClick={() => setRating(star)}
-                  style={{
-                    cursor: "pointer",
-                    color: star <= rating ? "gold" : "gray",
-                  }}
-                >
-                  ★
-                </span>
-              ))}
-            </RatingStars>
-            <FeedbackTextarea
-              placeholder="Any comments on the transcription?"
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-            />
-            <ButtonContainer>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleFeedbackSubmit}
-                disabled={isLoading}
-              >
-                Submit Feedback
-              </Button>
-            </ButtonContainer>
-          </FeedbackContainer>
-        )}
-      </DynamicMainContainer>
-    </>
+      <ModeContent
+        id={`panel-${activeMode}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${activeMode}`}
+      >
+        {activeMode === "stt" ? <SpeechToText /> : <TextToSpeech />}
+      </ModeContent>
+    </ModeShell>
   );
 };
 

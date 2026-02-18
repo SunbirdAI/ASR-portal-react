@@ -1,12 +1,14 @@
 import React from "react"
-import { Nav, Title, Logo } from "./Header.styles";
+import { Nav, Title, Logo, Brand } from "./Header.styles";
 import { Dropdown } from "../DropDown";
-import img from "../../images/logo.png";
+import img from "../../images/logo1.png";
 
 const Header = () => (
   <Nav>
-    <Logo alt="Logo" src={img} />
-    <Title>Speech To Text.</Title>
+    <Brand>
+      <Logo alt="Logo" src={img} />
+      <Title>Sunbird AI</Title>
+    </Brand>
     <Dropdown />
   </Nav>
 );

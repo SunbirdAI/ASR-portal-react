@@ -8,6 +8,8 @@ export const token = localStorage.getItem("access_token")
   : import.meta.env.VITE_SB_API_TOKEN;
 
 const asrUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/stt`;
+const ttsUrl =
+  import.meta.env.VITE_SB_TTS_URL;
 
 const asrDbUrl = `${import.meta.env.VITE_SB_API_URL}/transcriptions`;
 
@@ -47,6 +49,51 @@ export async function recognizeSpeech(audioData, languageCode, adapterCode) {
   } catch (error) {
     console.error("Error recognizing speech:", error);
     throw error; // Re-throw the error to be handled by the caller
+  }
+}
+
+/**
+ * Generates speech audio from text.
+ * @param {string} text - Text to convert into speech.
+ * @param {string|number} speakerID - Speaker ID supported by the TTS service.
+ * @return {Promise<Blob>} WAV audio blob.
+ */
+export async function generateSpeech(text, speakerID = "248") {
+  const normalizedText = text?.trim();
+  const normalizedSpeakerID = `${speakerID || "248"}`.trim();
+
+  if (!normalizedText) {
+    throw new Error("Text is required for text-to-speech generation.");
+  }
+
+  const queryParams = new URLSearchParams({
+    text: normalizedText,
+    speaker_id: normalizedSpeakerID || "248",
+  });
+
+  try {
+    const response = await fetch(`${ttsUrl}?${queryParams.toString()}`, {
+      method: "POST",
+      headers: {
+        Accept: "audio/wav, audio/*, */*",
+      },
+    });
+
+    if (!response.ok) {
+      const responseMessage = await response.text();
+      throw new Error(
+        responseMessage || `TTS request failed with status ${response.status}`
+      );
+    }
+
+    const audioBlob = await response.blob();
+    if (!audioBlob.size) {
+      throw new Error("TTS service returned an empty audio file.");
+    }
+    return audioBlob;
+  } catch (error) {
+    console.error("Error generating speech:", error);
+    throw error;
   }
 }
 
@@ -226,4 +273,3 @@ export const sendFeedback = async (
     return null;
   }
 };
-

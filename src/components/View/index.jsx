@@ -64,12 +64,12 @@ const View = () => {
                                     </h1>
                                     {
                                         edit ?
-                                            <button onClick={saveTranscriptChanges} disabled={loading} className="flex items-center justify-center hover:text-red-600">
+                                            <button onClick={saveTranscriptChanges} disabled={loading} className="flex items-center justify-center hover:bg-[#EFEFED] rounded px-2 py-1">
                                                 <i className={`fa ${loading ? "fa-spinner animate-spin" : "fa-save"} mr-2`}></i>
                                                 {loading ? "Saving" : "Save"}
                                             </button>
                                             :
-                                            <button onClick={() => setEdit(true)} className="flex items-center justify-center hover:text-red-600">
+                                            <button onClick={() => setEdit(true)} className="flex items-center justify-center hover:bg-[#EFEFED] rounded px-2 py-1">
                                                 <i className="fa fa-pencil mr-2"></i>
                                                 Edit
                                             </button>
@@ -87,7 +87,7 @@ const View = () => {
                         <div className="flex flex-col space-y-4  p-4 font-gelasio text-lg max-sm:text-sm">
                             {
                                 edit ?
-                                    <textarea ref={textareaRef} className="w-full border p-4 rounded-md focus:outline-none resize-none" value={newTranscript} onChange={(e) => setNewTranscript(e.target.value)}>
+                                    <textarea ref={textareaRef} className="w-full border border-black/30 p-4 rounded-md focus:outline-sunbird-orange resize-none" value={newTranscript} onChange={(e) => setNewTranscript(e.target.value)}>
 
                                     </textarea>
                                     :
@@ -102,7 +102,7 @@ const View = () => {
                     </div>
                 </div>
 
-                    <div className="fixed bottom-0 right-0 left-0 border-t z-50 bg-white py-2 flex items-center justify-center">
+                    <div className="fixed bottom-0 right-0 left-0 border-t border-sunbird-orange z-50 bg-white py-2 flex items-center justify-center">
 
                         <div className="max-w-screen-md pr-1 pl-1 mr-auto ml-auto flex justify-between items-center">
                             <div className="pr-4 pl-4 md:pr-6 md:pl-6">
@@ -119,7 +119,7 @@ const View = () => {
                     </div>
                 </> :
                 <div className="flex items-center justify-center">
-                    <i className="fa fa-spinner text-gray-600 fa-3x animate-spin"></i>
+                    <i className="fa fa-spinner text-black fa-3x animate-spin"></i>
 
                 </div>
         }

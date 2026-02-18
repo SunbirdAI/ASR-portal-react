@@ -1,143 +1,85 @@
-import { Button, RelativeDiv, Stripe, OuterRing, FlexRing, XContainer, XBar, DropDownItem, DropDownList, LoginButton } from './DropDown.styles'
-import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { SunMoon } from "lucide-react";
+import {
+  Button,
+  RelativeDiv,
+  OuterRing,
+  DropDownList,
+  ThemeOption,
+  ThemeOptions,
+  SectionLabel,
+} from "./DropDown.styles";
+import {
+  THEME_MODES,
+  applyThemeMode,
+  getStoredThemeMode,
+  setStoredThemeMode,
+} from "../../lib/theme";
+
+const themeChoices = [
+  { id: THEME_MODES.LIGHT, label: "Light" },
+  { id: THEME_MODES.DARK, label: "Dark" },
+  { id: THEME_MODES.SYSTEM, label: "System" },
+];
 
 export const Dropdown = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState(THEME_MODES.SYSTEM);
 
-  const [isOpen, setIsOpen] = useState(false)
+  useEffect(() => {
+    const storedMode = getStoredThemeMode();
+    setThemeMode(storedMode);
+    applyThemeMode(storedMode);
+  }, []);
 
-  function removeAccessToken() {
-    localStorage.removeItem('access_token');
-    window.location.reload()
-  }
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const onSystemThemeChange = () => {
+      if (themeMode === THEME_MODES.SYSTEM) {
+        applyThemeMode(THEME_MODES.SYSTEM);
+      }
+    };
 
+    mediaQuery.addEventListener("change", onSystemThemeChange);
+    return () => mediaQuery.removeEventListener("change", onSystemThemeChange);
+  }, [themeMode]);
 
-  const navItems = [
-    { path: "/", link: "Home" },
-    { path: "/files", link: "Recent Files" },
-    { path: "/login", link: "Logout" }
-
-  ]
-
-  function toggleDropdown(event) {
-    event.stopPropagation()
-    console.log("Dropdown toggled.")
-    setIsOpen(prev => !prev)
+  const setMode = (mode) => {
+    setThemeMode(mode);
+    setStoredThemeMode(mode);
+    applyThemeMode(mode);
   };
 
-  const DropDownMenu = () => {
-    return <RelativeDiv>
-      <Button
-        className="group"
-        onClick={toggleDropdown}
-        aria-label="Toggle dropdown"
-      >
-        <OuterRing >
-          <FlexRing>
+  const toggleDropdown = (event) => {
+    event.stopPropagation();
+    setIsOpen((prev) => !prev);
+  };
 
-            <Stripe className={` origin-left ${isOpen ? 'translate-x-10' : '-translate-x-0'} flex w-0 ${isOpen ? 'group-focus:w-12' : 'w-12'} `}></Stripe>
-            <Stripe className={` rounded  delay-75 ${isOpen ? 'translate-x-10' : '-translate-x-0'} flex w-0 ${isOpen ? 'group-focus:w-12' : 'w-12'} `}></Stripe>
-            <Stripe className={` origin-left  delay-150 ${isOpen ? 'translate-x-10' : '-translate-x-0'} flex w-0 ${isOpen ? 'group-focus:w-12' : 'w-12'} `}></Stripe>
-
-            <XContainer
-              className={` ${isOpen ? 'translate-x-0' : '-translate-x-10'
-                } flex w-0 ${isOpen ? 'w-12' : 'group-focus:w-12'}`}
-            >
-              <XBar className=" rotate-45 group-focus:rotate-45"></XBar>
-              <XBar className="-rotate-45 group-focus:-rotate-45"></XBar>
-            </XContainer>
-          </FlexRing>
+  return (
+    <RelativeDiv>
+      <Button onClick={toggleDropdown} aria-label="Change color mode">
+        <OuterRing>
+          <SunMoon size={18} strokeWidth={2} />
         </OuterRing>
       </Button>
 
       {isOpen && (
-        <DropDownList onMouseLeave={toggleDropdown}>
-
-          {navItems.map(({ link, path }) => link === "Logout" ?
-            <DropDownItem key={path} onClick={removeAccessToken}>
-              <NavLink to={path} className={({ isActive, isPending }) =>
-                isActive
-                  ? "active block"
-                  : isPending
-                    ? "pending block"
-                    : "block"
-              }>{link}</NavLink>
-            </DropDownItem>
-            : <li key={path} className="py-3 px-5 text-start text-medium hover:bg-blue-100 hover:text-large cursor-pointer">
-              <NavLink to={path} className={({ isActive, isPending }) =>
-                isActive
-                  ? "active block"
-                  : isPending
-                    ? "pending block"
-                    : "block"
-              }>{link}</NavLink>
-            </li>)}
-
+        <DropDownList onMouseLeave={() => setIsOpen(false)}>
+          <SectionLabel>Appearance</SectionLabel>
+          <ThemeOptions>
+            {themeChoices.map((choice) => (
+              <ThemeOption
+                key={choice.id}
+                type="button"
+                active={themeMode === choice.id}
+                onClick={() => setMode(choice.id)}
+              >
+                {choice.label}
+              </ThemeOption>
+            ))}
+          </ThemeOptions>
         </DropDownList>
       )}
     </RelativeDiv>
-  }
-
-
-  return (<>
-    {localStorage.getItem('access_token') ? <DropDownMenu>
-      <Button
-        className="group"
-        onClick={toggleDropdown}
-        aria-label="Toggle dropdown"
-      >
-        <OuterRing className="relative flex overflow-hidden items-center justify-center rounded-full w-12 h-12 transform transition-all bg-slate-700 ring-0 ring-gray-300 hover:ring-8 group-focus:ring-4 ring-opacity-30 duration-200 shadow-md">
-          <FlexRing>
-
-            <Stripe className={` origin-left ${isOpen ? 'translate-x-10' : '-translate-x-0'} flex w-0 ${isOpen ? 'group-focus:w-12' : 'w-12'} `}></Stripe>
-            <Stripe className={` rounded  delay-75 ${isOpen ? 'translate-x-10' : '-translate-x-0'} flex w-0 ${isOpen ? 'group-focus:w-12' : 'w-12'} `}></Stripe>
-            <Stripe className={` origin-left  delay-150 ${isOpen ? 'translate-x-10' : '-translate-x-0'} flex w-0 ${isOpen ? 'group-focus:w-12' : 'w-12'} `}></Stripe>
-
-            <XContainer
-              className={` ${isOpen ? 'translate-x-0' : '-translate-x-10'
-                } flex w-0 ${isOpen ? 'w-12' : 'group-focus:w-12'}`}
-            >
-              <XBar className=" rotate-45 group-focus:rotate-45"></XBar>
-              <XBar className="-rotate-45 group-focus:-rotate-45"></XBar>
-            </XContainer>
-          </FlexRing>
-        </OuterRing>
-      </Button>
-
-      {isOpen && (
-        <DropDownList onMouseLeave={toggleDropdown}>
-
-          {navItems.map(({ link, path }) => link === "Logout" ?
-            <DropDownItem key={path} onClick={removeAccessToken}>
-              <NavLink to={path} className={({ isActive, isPending }) =>
-                isActive
-                  ? "active block"
-                  : isPending
-                    ? "pending block"
-                    : "block"
-              }>{link}</NavLink>
-            </DropDownItem>
-            : <li key={path} className="py-3 px-5 text-start text-medium hover:bg-blue-100 hover:text-large cursor-pointer">
-              <NavLink to={path} className={({ isActive, isPending }) =>
-                isActive
-                  ? "active block"
-                  : isPending
-                    ? "pending block"
-                    : "block"
-              }>{link}</NavLink>
-            </li>)}
-
-        </DropDownList>
-      )}
-    </DropDownMenu>
-      : <LoginButton>
-        <NavLink className={"whitespace-nowrap"} to={'/login'} >
-          Sign In
-        </NavLink>
-      </LoginButton>
-
-    }
-
-  </>)
-
-}
+  );
+};
