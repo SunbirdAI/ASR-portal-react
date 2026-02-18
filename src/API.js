@@ -1,69 +1,167 @@
-// import pRetry from "p-retry";
-
 const FEEDBACK_URL = import.meta.env.VITE_FEEDBACK_URL;
-// const HUGGING_FACE_API_KEY = import.meta.env.VITE_HUGGING_FACE_API_KEY;
 export const tracking_id = import.meta.env.VITE_GA4_TRACKING_ID;
-export const token = localStorage.getItem("access_token")
-  ? localStorage.getItem("access_token")
-  : import.meta.env.VITE_SB_API_TOKEN;
 
 const asrUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/stt`;
 const ttsUrl =
-  import.meta.env.VITE_SB_TTS_URL;
-
+  import.meta.env.VITE_SB_TTS_URL ||
+  "https://sb-modal-ws--spark-tts-salt-sparktts-generate.modal.run";
 const asrDbUrl = `${import.meta.env.VITE_SB_API_URL}/transcriptions`;
+const REQUEST_TIMEOUT_MS = 45000;
+const NETWORK_ERROR_PATTERN = /failed to fetch|networkerror|load failed/i;
 
-// const textToSpeechUrl = "https://api-inference.huggingface.co/models/Sunbird/sunbird-lug-tts";
+const getAuthToken = () =>
+  localStorage.getItem("access_token") || import.meta.env.VITE_SB_API_TOKEN;
+
+const parseResponsePayload = async (response) => {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const text = await response.text();
+    return text || null;
+  } catch {
+    return null;
+  }
+};
+
+const toErrorMessage = (payload, fallback) => {
+  if (!payload) return fallback;
+
+  if (typeof payload === "string") return payload;
+
+  if (typeof payload.detail === "string") return payload.detail;
+  if (typeof payload.message === "string") return payload.message;
+  if (typeof payload.error === "string") return payload.error;
+
+  return fallback;
+};
+
+const mapStatusToMessage = (status, fallback) => {
+  if (status === 400) return "Your request could not be processed. Please check the inputs.";
+  if (status === 401) return "You are not authorized. Please sign in again.";
+  if (status === 403) return "You do not have access to perform this action.";
+  if (status === 404) return "The requested resource was not found.";
+  if (status === 408) return "The request timed out. Please try again.";
+  if (status === 413) return "The uploaded file is too large.";
+  if (status === 429) return "Too many requests. Please wait and try again.";
+  if (status >= 500) return "The server is currently unavailable. Please try again shortly.";
+  return fallback;
+};
+
+const normalizeRequestError = (error, fallbackMessage) => {
+  if (error?.name === "AbortError") {
+    return new Error("The request timed out. Please try again.");
+  }
+
+  if (
+    error instanceof TypeError &&
+    NETWORK_ERROR_PATTERN.test(error.message || "")
+  ) {
+    return new Error("Network connection issue. Please check your internet and try again.");
+  }
+
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(fallbackMessage);
+};
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const requestJson = async (url, options, fallbackMessage) => {
+  try {
+    const response = await fetchWithTimeout(url, options);
+    const payload = await parseResponsePayload(response);
+
+    if (!response.ok) {
+      const statusFallback = mapStatusToMessage(response.status, fallbackMessage);
+      throw new Error(toErrorMessage(payload, statusFallback));
+    }
+
+    if (!payload || typeof payload !== "object") {
+      throw new Error(fallbackMessage);
+    }
+
+    return payload;
+  } catch (error) {
+    throw normalizeRequestError(error, fallbackMessage);
+  }
+};
+
+const requestBlob = async (url, options, fallbackMessage) => {
+  try {
+    const response = await fetchWithTimeout(url, options, 90000);
+
+    if (!response.ok) {
+      const payload = await parseResponsePayload(response);
+      const statusFallback = mapStatusToMessage(response.status, fallbackMessage);
+      throw new Error(toErrorMessage(payload, statusFallback));
+    }
+
+    const blob = await response.blob();
+    if (!blob.size) {
+      throw new Error("The service returned an empty file. Please try again.");
+    }
+    return blob;
+  } catch (error) {
+    throw normalizeRequestError(error, fallbackMessage);
+  }
+};
 
 /**
  * Recognizes speech from an audio file and returns the transcribed text.
- * @param {Blob} audioData - The audio file as a Blob.
- * @param {string} languageCode - The language code (e.g.,  "eng","lug","nyn","teo","lgg","ach").
- * @param {string} adapterCode - The adapter code (e.g.,  "eng","lug","nyn","teo","lgg","ach").
- * @return {Promise<string>} The recognized text.
  */
 export async function recognizeSpeech(audioData, languageCode, adapterCode) {
   const formData = new FormData();
-  formData.append("audio", audioData); // You might need to adjust the filename.
+  formData.append("audio", audioData);
   formData.append("language", languageCode);
   formData.append("adapter", adapterCode);
   formData.append("whisper", true);
 
-  try {
-    const response = await fetch(asrUrl, {
+  return requestJson(
+    asrUrl,
+    {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${getAuthToken()}`,
         Accept: "application/json",
       },
       body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log(data);
-    return data;
-  } catch (error) {
-    console.error("Error recognizing speech:", error);
-    throw error; // Re-throw the error to be handled by the caller
-  }
+    },
+    "Unable to transcribe audio right now. Please try again."
+  );
 }
 
 /**
  * Generates speech audio from text.
- * @param {string} text - Text to convert into speech.
- * @param {string|number} speakerID - Speaker ID supported by the TTS service.
- * @return {Promise<Blob>} WAV audio blob.
  */
 export async function generateSpeech(text, speakerID = "248") {
   const normalizedText = text?.trim();
   const normalizedSpeakerID = `${speakerID || "248"}`.trim();
 
   if (!normalizedText) {
-    throw new Error("Text is required for text-to-speech generation.");
+    throw new Error("Please enter text before generating speech.");
   }
 
   const queryParams = new URLSearchParams({
@@ -71,109 +169,71 @@ export async function generateSpeech(text, speakerID = "248") {
     speaker_id: normalizedSpeakerID || "248",
   });
 
-  try {
-    const response = await fetch(`${ttsUrl}?${queryParams.toString()}`, {
+  return requestBlob(
+    `${ttsUrl}?${queryParams.toString()}`,
+    {
       method: "POST",
       headers: {
         Accept: "audio/wav, audio/*, */*",
       },
-    });
-
-    if (!response.ok) {
-      const responseMessage = await response.text();
-      throw new Error(
-        responseMessage || `TTS request failed with status ${response.status}`
-      );
-    }
-
-    const audioBlob = await response.blob();
-    if (!audioBlob.size) {
-      throw new Error("TTS service returned an empty audio file.");
-    }
-    return audioBlob;
-  } catch (error) {
-    console.error("Error generating speech:", error);
-    throw error;
-  }
+    },
+    "Unable to generate speech right now. Please try again."
+  );
 }
 
 export async function getTranscripts() {
-  const ascendingTranscriptUrl = `${asrDbUrl}?order_by=uploaded&descending=true`;
-  try {
-    const response = await fetch(`${ascendingTranscriptUrl}`, {
+  const transcriptsUrl = `${asrDbUrl}?order_by=uploaded&descending=true`;
+
+  return requestJson(
+    transcriptsUrl,
+    {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${getAuthToken()}`,
         Accept: "application/json",
       },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.log(error);
-    throw error;
-  }
+    },
+    "Unable to load recent files right now."
+  );
 }
 
 export async function getSingleTranscript(id) {
-  const asrDbSingleUrl = `${asrDbUrl}/${id}`;
-  try {
-    const response = await fetch(asrDbSingleUrl, {
+  return requestJson(
+    `${asrDbUrl}/${id}`,
+    {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${getAuthToken()}`,
         Accept: "application/json",
       },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.log(error);
-    throw error;
-  }
+    },
+    "Unable to load this transcription right now."
+  );
 }
 
 export async function updateTranscript(id, transcript) {
-  const asrDbUpdateUrl = `${asrDbUrl}/${id}`;
-
   const formData = new FormData();
   formData.append("transcription_text", transcript);
-  try {
-    const response = await fetch(asrDbUpdateUrl, {
+
+  return requestJson(
+    `${asrDbUrl}/${id}`,
+    {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${getAuthToken()}`,
         Accept: "application/json",
       },
       body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.log(error);
-    throw error;
-  }
+    },
+    "Unable to save changes right now."
+  );
 }
+
 export const registerNewAccount = async (values) => {
-  let data = {};
+  const formErrorFallback = "Unable to create account right now. Please try again.";
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${import.meta.env.VITE_SB_API_URL}/auth/register`,
       {
         method: "POST",
@@ -191,29 +251,36 @@ export const registerNewAccount = async (values) => {
       }
     );
 
-    const responseBody = await response.json();
-    if (response.status === 400) {
-      data.error = responseBody.detail || "Invalid username or email";
-    } else if (response.status === 201) {
-      data.success = "Account succressfully created";
-      console.log("message", responseBody);
+    const payload = await parseResponsePayload(response);
+
+    if (response.status === 201) {
+      return { success: "Account successfully created." };
     }
+
+    return {
+      error: toErrorMessage(
+        payload,
+        mapStatusToMessage(response.status, formErrorFallback)
+      ),
+    };
   } catch (error) {
-    data.error = "Something went wrong";
-    console.error("Error occurred during form submission:", error);
-    throw error;
+    console.error("Registration error:", error);
+    return {
+      error:
+        error?.name === "AbortError"
+          ? "Registration timed out. Please try again."
+          : formErrorFallback,
+    };
   }
-  return data;
 };
 
 export const loginIntoAccount = async (values) => {
-  let data = {};
   const formData = new FormData();
   formData.append("username", values.username);
   formData.append("password", values.password);
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${import.meta.env.VITE_SB_API_URL}/auth/token`,
       {
         method: "POST",
@@ -223,20 +290,29 @@ export const loginIntoAccount = async (values) => {
         body: formData,
       }
     );
-    const responseBody = await response.json();
-    console.log(`Response: ${response.ok} Status code: ${response.status}`);
-    if (response.status === 200) {
-      data.success = "Successful Login!";
-      localStorage.setItem("access_token", responseBody.access_token);
-    } else if (response.status === 401) {
-      data.error = responseBody.detail;
+
+    const payload = await parseResponsePayload(response);
+
+    if (response.status === 200 && payload?.access_token) {
+      localStorage.setItem("access_token", payload.access_token);
+      return { success: "Successful login." };
     }
+
+    return {
+      error: toErrorMessage(
+        payload,
+        mapStatusToMessage(response.status, "Unable to sign in. Please try again.")
+      ),
+    };
   } catch (error) {
-    data.error = "Something went wrong";
-    console.error("Error occurred during form submission:", error);
-    throw error;
+    console.error("Login error:", error);
+    return {
+      error:
+        error?.name === "AbortError"
+          ? "Sign in timed out. Please try again."
+          : "Unable to sign in right now. Please try again.",
+    };
   }
-  return data;
 };
 
 export const sendFeedback = async (
@@ -249,27 +325,27 @@ export const sendFeedback = async (
   comment
 ) => {
   const time = Date.now();
-  const requestOptions = {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      Timestamp: time,
-      feedback,
-      Language: language,
-      username,
-      TranscriptionText: transcription,
-      AudioURL: audio_url,
-      TranscriptionID: transcriptionID,
-      Comment: comment,
-      FeedBackType: "ASRPortal",
-    }),
-  };
-
-  try {
-    const response = await fetch(FEEDBACK_URL, requestOptions);
-    return await response.json();
-  } catch (err) {
-    console.error(err);
-    return null;
+  if (!FEEDBACK_URL) {
+    throw new Error("Feedback service is not configured. Please try again later.");
   }
+
+  return requestJson(
+    FEEDBACK_URL,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        Timestamp: time,
+        feedback,
+        Language: language,
+        username,
+        TranscriptionText: transcription,
+        AudioURL: audio_url,
+        TranscriptionID: transcriptionID,
+        Comment: comment,
+        FeedBackType: "ASRPortal",
+      }),
+    },
+    "Unable to submit feedback right now."
+  );
 };

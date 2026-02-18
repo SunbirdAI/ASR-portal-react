@@ -1,54 +1,89 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, TextField } from "@mui/material";
+import { Button, TextField } from "@mui/material";
 import { ThumbDown, ThumbUp } from "@mui/icons-material";
 import { sendFeedback } from "../../API";
-import { styles } from './Feedback.styles';
+import { getUserFacingErrorMessage } from "../../lib/error-utils";
+import StatusBanner from "../StatusBanner";
+import { styles } from "./Feedback.styles";
 
 const Feedback = ({ sourceText, transcription, from, to }) => {
   const [rated, setRated] = useState(false);
   const [rating, setRating] = useState(0);
-  const [showAlert, setShowAlert] = useState(false);
   const prevText = useRef();
-  const [correctTranscription, setCorrectTranscription] = useState('');
-  const [username, setUsername] = useState('');
+  const [correctTranscription, setCorrectTranscription] = useState("");
+  const [username, setUsername] = useState("");
   const [showDialog, setShowDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     if (prevText.current !== transcription) {
       setRated(false);
       setRating(0);
+      setShowDialog(false);
+      setErrorMessage("");
+      setSuccessMessage("");
     }
     prevText.current = transcription;
   }, [transcription]);
 
-  useEffect(() => {
-    const timeId = setTimeout(() => {
-      setShowAlert(false);
-    }, 1500);
-    return () => clearTimeout(timeId);
-  }, [showAlert]);
-
   const handleSubmit = async (isGood) => {
-    setRated(true);
-    setRating(isGood ? 1 : 2);
-    setShowAlert(true);
+    const feedbackType = isGood ? "Good" : "Bad";
+    const languageContext =
+      [from, to].filter(Boolean).join(" -> ") || "Not specified";
+    const comment = isGood ? null : correctTranscription.trim() || null;
+
+    setErrorMessage("");
+    setSuccessMessage("");
+    setIsSubmitting(true);
+
     try {
-      await sendFeedback(isGood ? 'Good' : 'Bad', correctTranscription, username, sourceText, transcription, from, to);
-      setCorrectTranscription('');
-      // setUsername('');
+      await sendFeedback(
+        feedbackType,
+        username.trim() || "ANONYMOUS_USER",
+        languageContext,
+        transcription || sourceText || null,
+        null,
+        null,
+        comment
+      );
+      setRated(true);
+      setRating(isGood ? 1 : 2);
+      setSuccessMessage("Thank you. Your feedback has been submitted.");
+      setCorrectTranscription("");
       setShowDialog(false);
     } catch (e) {
-      console.log(e);
+      setErrorMessage(
+        getUserFacingErrorMessage(
+          e,
+          "Unable to submit feedback right now. Please try again."
+        )
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div style={styles.container}>
-    <p style={styles.feedbackText}>Please help us improve the Transcription quality with your feedback.</p>
+      <p style={styles.feedbackText}>
+        Please help us improve transcription quality with your feedback.
+      </p>
+      <StatusBanner
+        type="error"
+        message={errorMessage}
+        onDismiss={() => setErrorMessage("")}
+      />
+      <StatusBanner
+        type="success"
+        message={successMessage}
+        onDismiss={() => setSuccessMessage("")}
+      />
       <div className="grid grid-cols-2 gap-4">
         <Button
           variant={rating === 1 ? "contained" : "outlined"}
-          disabled={rated || transcription === ''}
+          disabled={rated || transcription === "" || isSubmitting}
           endIcon={<ThumbUp />}
           onClick={() => handleSubmit(true)}
           sx={{
@@ -65,7 +100,7 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
           Good Transcription
         </Button>
         <Button
-          disabled={rated || transcription === ''}
+          disabled={rated || transcription === "" || isSubmitting}
           variant={rating === 2 ? "contained" : "outlined"}
           endIcon={<ThumbDown />}
           onClick={() => setShowDialog(true)}
@@ -83,7 +118,6 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
           Bad Transcription
         </Button>
       </div>
-      {showAlert && <Alert severity="warning">Thanks for the feedback</Alert>}
       {showDialog && (
         <div className="flex flex-col gap-4 mt-4">
           <TextField
@@ -126,6 +160,7 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
           <Button
             variant="contained"
             onClick={() => handleSubmit(false)}
+            disabled={isSubmitting}
             sx={{
               color: "#000",
               backgroundColor: "#ffffff",
@@ -136,7 +171,7 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
             }}
             fullWidth
           >
-            Submit Feedback
+            {isSubmitting ? "Submitting..." : "Submit Feedback"}
           </Button>
         </div>
       )}

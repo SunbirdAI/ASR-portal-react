@@ -69,18 +69,6 @@ export const CharacterCounter = styled.span`
   color: var(--color-muted);
 `;
 
-export const MessageText = styled.p`
-  ${tw`m-0 text-sm text-black`}
-  background: ${(props) =>
-    props.error ? "var(--color-accent-soft)" : "var(--color-pill)"};
-  color: var(--color-text);
-  border: 1px solid
-    ${(props) =>
-      props.error ? "rgba(217, 119, 6, 0.38)" : "var(--color-border)"};
-  padding: 8px 10px;
-  border-radius: 10px;
-`;
-
 export const AudioPreview = styled.audio`
   ${tw`w-full`}
 `;
