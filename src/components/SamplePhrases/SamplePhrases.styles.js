@@ -10,13 +10,15 @@ export const SamplePhrasesAccordion = styled.div`
 export const PhraseList = styled.ul`
   ${tw`
     divide-y
-    divide-gray-100
+    divide-[#E5E5E3]
    `}
 `;
 
 export const PhraseListItem = styled.li`
   ${tw`
     p-3
-    hover:bg-gray-100
    `}
+  &:hover {
+    background: #efefed;
+  }
 `;

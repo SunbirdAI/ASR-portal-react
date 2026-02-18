@@ -134,28 +134,40 @@ const AudioInput = ({ onAudioSubmit, isLoading }) => {
             <TailSpin
               height="50"
               width="50"
-              color="#4fa94d"
+              color="var(--color-accent)"
               ariaLabel="loading"
             />
           </LoadingContainer>
         ) : (
-          "click or drop your audio file here."
+          "Click or drop your audio file here (max 15MB, up to 15 minutes)."
         )}
       </DropZoneContainer>
       <VerticalDottedLine />
       <RecordingArea>
         <Button
-          variant="contained"
-          color="primary"
+          aria-label={recording ? "Stop recording" : "Start recording"}
           disabled={isLoading}
           onClick={toggleRecording}
           sx={{
-            borderRadius: "40%",
-            height: 46,
-            width: 46,
-            minWidth: 46,
-            padding: "10px",
-            mt: 2,
+            borderRadius: "999px",
+            minHeight: 48,
+            minWidth: 48,
+            px: 2,
+            py: 1.5,
+            color: "var(--color-text)",
+            background: recording
+              ? "var(--color-accent-soft)"
+              : "var(--color-surface)",
+            border: recording
+              ? "1px solid rgba(217,119,6,0.4)"
+              : "1px solid var(--color-border)",
+            "&:hover": {
+              background: "var(--color-pill)",
+            },
+            "&:focus-visible": {
+              outline: "3px solid var(--color-focus-ring)",
+              outlineOffset: "2px",
+            },
             "& .MuiButton-startIcon": {
               margin: 0,
             },
@@ -185,7 +197,7 @@ const MicIcon = () => (
 );
 
 const StopIcon = () => (
-  <SvgIcon sx={{ color: "red" }}>
+  <SvgIcon sx={{ color: "var(--color-accent)" }}>
     <circle cx="12" cy="12" r="10" />
   </SvgIcon>
 );

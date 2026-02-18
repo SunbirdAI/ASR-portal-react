@@ -9,32 +9,38 @@ export const Nav = styled.div`
     items-center
     justify-center
     p-4
-    bg-gray-800
-    text-white
+    bg-white
+    text-black
     z-50
   `}
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-top: 1px solid var(--color-border);
 `;
 
 export const AudioPlayerContainer = styled.div`
-  ${tw`w-full max-w-md mx-auto my-2`}
+  ${tw`w-full max-w-xl`}
 `;
 
 export const FooterContainer = styled.footer`
   ${tw`
-    fixed
-    inset-x-0
-    bottom-0
-    z-10
+    w-full
+    flex
+    flex-col
+    md:flex-row
+    md:items-center
+    md:justify-between
+    gap-3
+    p-3
+    rounded-2xl
   `}
-  background: #fff; // Or any color to match your design
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--color-elev-shadow);
 `;
 
 export const ButtonContainer = styled.div`
-  ${tw`absolute right-4 bottom-4`}
-  @media (max-width: 60px) {
-    ${tw`relative mt-4`}
-  }
+  ${tw`w-full md:w-auto flex justify-end`}
 `;
 
 export const EditButtonContainer = styled.div`
@@ -45,23 +51,6 @@ export const EditButtonContainer = styled.div`
 `;
 
 export const TextNav = styled.p`
-  ${tw`hidden md:flex`}
-  font-size: 16px; // Base font size for larger screens
-
-  @media (min-width: 768px) {
-    display: block; // Show text on screens larger than 768px
-    ${tw`flex-row`}
-  }
-
-  @media (max-width: 768px) {
-    display: none; // Hide text on screens smaller than or equal to 768px
-    font-size: 14px; // Smaller font size for tablets (optional if hidden)
-  }
-
-  @media (max-width: 480px) {
-    display: none; // Ensure text remains hidden on very small devices
-    font-size: 12px; // Even smaller font size (optional if hidden)
-  }
+  ${tw`m-0`}
+  font-size: 14px;
 `;
-
-

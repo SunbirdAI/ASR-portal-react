@@ -51,6 +51,15 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
           disabled={rated || transcription === ''}
           endIcon={<ThumbUp />}
           onClick={() => handleSubmit(true)}
+          sx={{
+            color: "#000",
+            borderColor: "rgba(0,0,0,0.24)",
+            backgroundColor: rating === 1 ? "#d97706" : "#fff",
+            "&:hover": {
+              backgroundColor: "#efefed",
+              borderColor: "#d97706",
+            },
+          }}
           fullWidth
         >
           Good Transcription
@@ -60,12 +69,21 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
           variant={rating === 2 ? "contained" : "outlined"}
           endIcon={<ThumbDown />}
           onClick={() => setShowDialog(true)}
+          sx={{
+            color: "#000",
+            borderColor: "rgba(0,0,0,0.24)",
+            backgroundColor: rating === 2 ? "#d97706" : "#fff",
+            "&:hover": {
+              backgroundColor: "#efefed",
+              borderColor: "#d97706",
+            },
+          }}
           fullWidth
         >
           Bad Transcription
         </Button>
       </div>
-      {showAlert && <Alert severity="success">Thanks for the feedback</Alert>}
+      {showAlert && <Alert severity="warning">Thanks for the feedback</Alert>}
       {showDialog && (
         <div className="flex flex-col gap-4 mt-4">
           <TextField
@@ -76,6 +94,15 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
             value={correctTranscription}
             onChange={(e) => setCorrectTranscription(e.target.value)}
             variant="outlined"
+            sx={{
+              "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                {
+                  borderColor: "#d97706",
+                },
+              "& .MuiInputLabel-root.Mui-focused": {
+                color: "#000",
+              },
+            }}
             fullWidth
           />
           <TextField
@@ -85,12 +112,28 @@ const Feedback = ({ sourceText, transcription, from, to }) => {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             variant="outlined"
+            sx={{
+              "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
+                {
+                  borderColor: "#d97706",
+                },
+              "& .MuiInputLabel-root.Mui-focused": {
+                color: "#000",
+              },
+            }}
             fullWidth
           />
           <Button
             variant="contained"
-            color="primary"
             onClick={() => handleSubmit(false)}
+            sx={{
+              color: "#000",
+              backgroundColor: "#ffffff",
+              border: "1px solid #d97706",
+              "&:hover": {
+                backgroundColor: "#efefed",
+              },
+            }}
             fullWidth
           >
             Submit Feedback

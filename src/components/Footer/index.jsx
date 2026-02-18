@@ -30,10 +30,24 @@ const Footer = ({ audioSrc, text, copyToClipboard, copySuccess, id }) => (
         </EditButtonContainer> */}
         <ButtonContainer>
             <Button
+                variant="outlined"
                 onClick={copyToClipboard}
                 disabled={!text}
-                endIcon={<ContentCopy />}
-                size="small"
+                endIcon={<ContentCopy fontSize="small" />}
+                size="medium"
+                sx={{
+                  minHeight: 42,
+                  borderRadius: "999px",
+                  textTransform: "none",
+                  px: 2,
+                  color: "var(--color-text)",
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-pill)",
+                  "&:hover": {
+                    borderColor: "var(--color-accent)",
+                    backgroundColor: "var(--color-surface)",
+                  },
+                }}
             >
                 <TextNav>Copy Text</TextNav>
             </Button>

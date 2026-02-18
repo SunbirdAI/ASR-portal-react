@@ -3,11 +3,16 @@ import tw, { styled } from 'twin.macro';
 export const Container = styled.div`
   ${tw`
     flex
-    items-center
-    justify-between
-    p-10
+    flex-col
+    items-stretch
+    justify-start
+    p-0
+    gap-4
     w-full
   `}
+  @media (min-width: 768px) {
+    ${tw`flex-row items-center`}
+  }
 `;
 
 
@@ -18,45 +23,41 @@ export const DropZoneContainer = styled.div`
     justify-center
     items-center
     p-6
-    text-gray-700
+    text-black
     border-2
     border-dashed
-    border-gray-300
-    rounded-lg
+    rounded-2xl
     cursor-pointer
     transition
     duration-200
     ease-in-out
   `}
-  background-color: #f9f9f9;
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background: var(--color-surface);
   &:hover {
-    border-color: #a0aec0;
-    background-color: #e9e9e9;
+    border-color: var(--color-border);
+    background: var(--color-pill);
   }
   &.active {
-    border-color: #000;
-    background-color: #e9e9e9;
-    color: #000;
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-text);
   }
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-   @media (min-width: 768px) {
-    ${tw`flex-row`}
-  }
-  font-size: 16px; // Base font size
-  @media (max-width: 768px) {
-    font-size: 14px; // Smaller font size for tablets
-  }
-  @media (max-width: 480px) {
-    font-size: 12px; // Even smaller font size for mobile phones
-  }
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  min-height: 132px;
+  font-size: 15px;
+  text-align: center;
+  line-height: 1.5;
 `;
 
 export const RecordingArea = styled.div`
   ${tw`
     flex
-    flex-col
     items-center
     justify-center
+    w-full
+    md:w-auto
   `}
 `;
 
@@ -71,6 +72,6 @@ export const LoadingContainer = styled.div`
 `;
 
 export const VerticalDottedLine = styled.div`
-  ${tw`w-0 h-full bg-transparent border-l-2 border-dotted border-gray-900 my-4 mx-4`}
+  ${tw`hidden md:block w-0 h-16 bg-transparent border-l-2 border-dotted my-4 mx-2`}
+  border-color: var(--color-border);
 `;
-

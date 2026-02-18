@@ -3,8 +3,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "sunbird-navy-blue": "#282850",
-        "sunbird-orange": "#FFAA28",
+        "sunbird-navy-blue": "#1A1A1A",
+        "sunbird-orange": "#D97706",
       },
     },
   },

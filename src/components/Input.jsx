@@ -10,12 +10,12 @@ const Input = forwardRef((props, ref) => {
     return (
       <div
         tabIndex={0}
-        className={`group flex justify-between items-center h-12 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-base focus-within:border-transparent focus-within:ring-2 focus-within:ring-sunbird-orange ${props.disabled ? " cursor-not-allowed opacity-50" : ""}`}
+        className={`group flex justify-between items-center h-12 w-full rounded-xl border border-[#E5E5E3] bg-white px-3 py-2 text-base focus-within:border-transparent focus-within:ring-2 focus-within:ring-sunbird-orange ${props.disabled ? " cursor-not-allowed opacity-50" : ""}`}
       >
         <input
           type={visible ? "text" : "password"}
           className={cn(
-            "placeholder:text-gray-400 bg-transparent focus-visible:outline-none border-none disabled:cursor-not-allowed",
+            "placeholder:text-[#6B6B6B] bg-transparent focus-visible:outline-none border-none disabled:cursor-not-allowed",
             className
           )}
           ref={ref}
@@ -33,7 +33,7 @@ const Input = forwardRef((props, ref) => {
       <input
         type={type}
         className={cn(
-          "flex h-12 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-sunbird-orange disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-12 w-full rounded-xl border border-[#E5E5E3] bg-white px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[#6B6B6B] focus-visible:outline-sunbird-orange disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         ref={ref}
