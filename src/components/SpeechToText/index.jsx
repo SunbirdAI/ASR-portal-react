@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { recognizeSpeech, sendFeedback } from "../../API";
 import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
+import { getUserFacingErrorMessage } from "../../lib/error-utils";
 import AudioInput from "../AudioInput";
 import Footer from "../Footer";
 import TranscriptionTextArea from "../TranscriptionTextArea";
+import StatusBanner from "../StatusBanner";
 import {
   ButtonContainer,
   CloseButton,
@@ -86,6 +88,8 @@ const SpeechToText = () => {
   const [rating, setRating] = useState(0); // Rating for transcription accuracy
   const [transcriptionID, setTranscriptionID] = useState(null); // Store transcription ID
   const [showFeedback, setShowFeedback] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     return () => {
@@ -102,6 +106,7 @@ const SpeechToText = () => {
       setTimeout(() => setCopySuccess(false), 3000);
     } catch (err) {
       console.error("Failed to copy!", err);
+      setErrorMessage("Unable to copy text right now. Please copy manually.");
     }
   };
 
@@ -113,6 +118,8 @@ const SpeechToText = () => {
       "Transcription Requested",
       "Transcribe Button"
     );
+    setErrorMessage("");
+    setSuccessMessage("");
     setIsLoading(true);
     try {
       const transcript = await recognizeSpeech(audioData, language, language);
@@ -126,11 +133,23 @@ const SpeechToText = () => {
         setTranscriptionID(transcript.audio_transcription_id); // Store transcription ID
       }
       setTextOutput(transcript.audio_transcription);
+      if (!transcript.audio_transcription) {
+        setErrorMessage(
+          "No speech was detected in this audio. Please try a clearer sample."
+        );
+      }
     } catch (e) {
       console.error("Transcription error:", e);
       setTextOutput("");
+      setErrorMessage(
+        getUserFacingErrorMessage(
+          e,
+          "Unable to transcribe audio right now. Please try again."
+        )
+      );
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [audioData, language]);
 
   const handleAudioLoad = useCallback((audioData) => {
@@ -153,6 +172,8 @@ const SpeechToText = () => {
 
     const feedbackValue = rating >= 4 ? "Good" : "Bad";
 
+    setErrorMessage("");
+    setSuccessMessage("");
     setIsLoading(true);
     try {
       await sendFeedback(
@@ -164,12 +185,18 @@ const SpeechToText = () => {
         transcriptionID,
         feedback
       );
-      alert("Thank you for your feedback!");
+      setSuccessMessage("Thank you. Your feedback has been submitted.");
       setFeedback("");
       setRating(0);
       setShowFeedback(false);
     } catch (e) {
       console.error("Feedback error:", e);
+      setErrorMessage(
+        getUserFacingErrorMessage(
+          e,
+          "Unable to submit feedback right now. Please try again."
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -183,6 +210,8 @@ const SpeechToText = () => {
     setFeedback("");
     setRating(0);
     setShowFeedback(false);
+    setErrorMessage("");
+    setSuccessMessage("");
   };
 
   const activeStep = textOutput ? 4 : audioData ? 3 : 1;
@@ -288,6 +317,16 @@ const SpeechToText = () => {
               The recognized text appears here. Use copy and feedback tools
               after generation.
             </StepDescription>
+            <StatusBanner
+              type="error"
+              message={errorMessage}
+              onDismiss={() => setErrorMessage("")}
+            />
+            <StatusBanner
+              type="success"
+              message={successMessage}
+              onDismiss={() => setSuccessMessage("")}
+            />
             <TranscriptionTextArea
               placeholder="Your recognized text will appear here."
               text={textOutput}

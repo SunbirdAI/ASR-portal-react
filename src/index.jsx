@@ -6,6 +6,7 @@ import reportWebVitals from "./reportWebVitals";
 import ReactGA from "react-ga4";
 import Hotjar from '@hotjar/browser';
 import { initializeTheme } from "./lib/theme";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const siteId = 5091559;
 const hotjarVersion = 6;
@@ -18,7 +19,7 @@ const root = ReactDOM.createRoot(
   document.getElementById("root") 
 );
 
-if (import.meta.env.MODE === "Production") {
+if (import.meta.env.MODE === "production") {
   ReactGA.initialize(`${import.meta.env.VITE_GA4_MEASUREMENT_ID}`, {
     gaOptions: {
       anonymizeIp: true,
@@ -29,7 +30,9 @@ if (import.meta.env.MODE === "Production") {
 }
 root.render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
 

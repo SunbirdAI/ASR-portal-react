@@ -18,7 +18,7 @@ import SignInForm from "./components/Auth/SignIn";
 
 const usePageViews = (location) => {
   useEffect(() => {
-    if (import.meta.env.MODE === "Production") {
+    if (import.meta.env.MODE === "production") {
       ReactGA.send({
         hitType: "pageview",
         page: location.pathname + location.hash + location.search,

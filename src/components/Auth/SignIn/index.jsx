@@ -47,8 +47,7 @@ const SignInForm = () => {
       .then((data) => {
         if (data?.success) {
           setSuccess(data?.success);
-          navigate("/");
-          window.location.reload(); // To be removed after implementing AuthContext
+          navigate("/", { replace: true });
         }
 
         if (data?.error) {

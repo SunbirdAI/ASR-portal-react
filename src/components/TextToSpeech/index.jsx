@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import LinearProgress from "@mui/material/LinearProgress";
 import { generateSpeech } from "../../API";
+import { getUserFacingErrorMessage } from "../../lib/error-utils";
 import {
   ButtonContainer,
   DynamicMainContainer,
@@ -28,11 +29,11 @@ import {
   LoadingMeta,
   LoadingNotice,
   LoadingTitle,
-  MessageText,
   PlaceholderCard,
   SpeakerSelect,
   TtsTextArea,
 } from "./TextToSpeech.styles";
+import StatusBanner from "../StatusBanner";
 
 const DEFAULT_SPEAKER_ID = "248";
 const MAX_TEXT_LENGTH = 600;
@@ -103,7 +104,10 @@ const TextToSpeech = () => {
     } catch (error) {
       console.error(error);
       setErrorMessage(
-        error?.message || "Failed to generate speech. Please try again."
+        getUserFacingErrorMessage(
+          error,
+          "Unable to generate speech right now. Please try again."
+        )
       );
     } finally {
       setIsLoading(false);
@@ -256,8 +260,16 @@ const TextToSpeech = () => {
               </LoadingNotice>
             )}
 
-            {errorMessage && <MessageText error>{errorMessage}</MessageText>}
-            {message && <MessageText>{message}</MessageText>}
+            <StatusBanner
+              type="error"
+              message={errorMessage}
+              onDismiss={() => setErrorMessage("")}
+            />
+            <StatusBanner
+              type="success"
+              message={message}
+              onDismiss={() => setMessage("")}
+            />
 
             <ButtonContainer>
               <GhostButton
