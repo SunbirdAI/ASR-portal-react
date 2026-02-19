@@ -7,6 +7,10 @@ const ttsUrl =
   "https://sb-modal-ws--spark-tts-salt-sparktts-generate.modal.run";
 const asrDbUrl = `${import.meta.env.VITE_SB_API_URL}/transcriptions`;
 const REQUEST_TIMEOUT_MS = 45000;
+const DEFAULT_STT_TIMEOUT_MS = 180000;
+const STT_REQUEST_TIMEOUT_MS = Number(
+  import.meta.env.VITE_SB_STT_TIMEOUT_MS ?? DEFAULT_STT_TIMEOUT_MS
+);
 const NETWORK_ERROR_PATTERN = /failed to fetch|networkerror|load failed/i;
 
 const getAuthToken = () =>
@@ -74,7 +78,19 @@ const normalizeRequestError = (error, fallbackMessage) => {
   return new Error(fallbackMessage);
 };
 
-const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
+const fetchWithTimeout = async (
+  url,
+  options = {},
+  timeoutMs = REQUEST_TIMEOUT_MS
+) => {
+  if (
+    typeof timeoutMs !== "number" ||
+    Number.isNaN(timeoutMs) ||
+    timeoutMs <= 0
+  ) {
+    return fetch(url, options);
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -89,9 +105,9 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_M
   }
 };
 
-const requestJson = async (url, options, fallbackMessage) => {
+const requestJson = async (url, options, fallbackMessage, timeoutMs = REQUEST_TIMEOUT_MS) => {
   try {
-    const response = await fetchWithTimeout(url, options);
+    const response = await fetchWithTimeout(url, options, timeoutMs);
     const payload = await parseResponsePayload(response);
 
     if (!response.ok) {
@@ -149,7 +165,8 @@ export async function recognizeSpeech(audioData, languageCode, adapterCode) {
       },
       body: formData,
     },
-    "Unable to transcribe audio right now. Please try again."
+    "Unable to transcribe audio right now. Please try again.",
+    STT_REQUEST_TIMEOUT_MS
   );
 }
 
