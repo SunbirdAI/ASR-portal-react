@@ -7,10 +7,7 @@ const ttsUrl =
   "https://sb-modal-ws--spark-tts-salt-sparktts-generate.modal.run";
 const asrDbUrl = `${import.meta.env.VITE_SB_API_URL}/transcriptions`;
 const REQUEST_TIMEOUT_MS = 45000;
-const DEFAULT_STT_TIMEOUT_MS = 180000;
-const STT_REQUEST_TIMEOUT_MS = Number(
-  import.meta.env.VITE_SB_STT_TIMEOUT_MS ?? DEFAULT_STT_TIMEOUT_MS
-);
+const NO_REQUEST_TIMEOUT = 0;
 const NETWORK_ERROR_PATTERN = /failed to fetch|networkerror|load failed/i;
 
 const getAuthToken = () =>
@@ -52,7 +49,7 @@ const mapStatusToMessage = (status, fallback) => {
   if (status === 401) return "You are not authorized. Please sign in again.";
   if (status === 403) return "You do not have access to perform this action.";
   if (status === 404) return "The requested resource was not found.";
-  if (status === 408) return "The request timed out. Please try again.";
+  if (status === 408 || status === 504) return "The backend took longer than expected. Please try again.";
   if (status === 413) return "The uploaded file is too large.";
   if (status === 429) return "Too many requests. Please wait and try again.";
   if (status >= 500) return "The server is currently unavailable. Please try again shortly.";
@@ -125,9 +122,14 @@ const requestJson = async (url, options, fallbackMessage, timeoutMs = REQUEST_TI
   }
 };
 
-const requestBlob = async (url, options, fallbackMessage) => {
+const requestBlob = async (
+  url,
+  options,
+  fallbackMessage,
+  timeoutMs = REQUEST_TIMEOUT_MS
+) => {
   try {
-    const response = await fetchWithTimeout(url, options, 90000);
+    const response = await fetchWithTimeout(url, options, timeoutMs);
 
     if (!response.ok) {
       const payload = await parseResponsePayload(response);
@@ -166,7 +168,7 @@ export async function recognizeSpeech(audioData, languageCode, adapterCode) {
       body: formData,
     },
     "Unable to transcribe audio right now. Please try again.",
-    STT_REQUEST_TIMEOUT_MS
+    NO_REQUEST_TIMEOUT
   );
 }
 
@@ -194,7 +196,8 @@ export async function generateSpeech(text, speakerID = "248") {
         Accept: "audio/wav, audio/*, */*",
       },
     },
-    "Unable to generate speech right now. Please try again."
+    "Unable to generate speech right now. Please try again.",
+    NO_REQUEST_TIMEOUT
   );
 }
 

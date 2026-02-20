@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import LinearProgress from "@mui/material/LinearProgress";
 import { recognizeSpeech, sendFeedback } from "../../API";
 import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
 import { getUserFacingErrorMessage } from "../../lib/error-utils";
@@ -76,12 +77,43 @@ const sourceOptions = [
   },
 ];
 
+const TRANSCRIPTION_PROGRESS_STAGES = [
+  {
+    minSeconds: 0,
+    progress: 30,
+    title: "Stage 1 of 3: Uploading audio",
+    message: "Preparing your request and sending audio to the server.",
+  },
+  {
+    minSeconds: 10,
+    progress: 65,
+    title: "Stage 2 of 3: Transcribing speech",
+    message: "The model is processing your audio.",
+  },
+  {
+    minSeconds: 25,
+    progress: 92,
+    title: "Stage 3 of 3: Finalizing result",
+    message: "Still working. Cold starts can make this step take longer.",
+  },
+];
+
+const getActiveProgressStage = (elapsedSeconds, stages) =>
+  stages.reduce((activeStage, stage) => {
+    if (elapsedSeconds >= stage.minSeconds) {
+      return stage;
+    }
+    return activeStage;
+  }, stages[0]);
+
 const SpeechToText = () => {
   const [language, setLanguage] = useState("lug");
   const [textOutput, setTextOutput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [audioSrc, setAudioSrc] = useState("");
   const [audioData, setAudioData] = useState(null);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showNote, setShowNote] = useState(true);
   const [feedback, setFeedback] = useState(""); // Feedback comments
@@ -98,6 +130,19 @@ const SpeechToText = () => {
       }
     };
   }, [audioSrc]);
+
+  useEffect(() => {
+    if (!isTranscribing) {
+      setLoadingSeconds(0);
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setLoadingSeconds((previousSeconds) => previousSeconds + 1);
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isTranscribing]);
 
   const copyToClipboard = async () => {
     try {
@@ -120,7 +165,8 @@ const SpeechToText = () => {
     );
     setErrorMessage("");
     setSuccessMessage("");
-    setIsLoading(true);
+    setIsTranscribing(true);
+    setLoadingSeconds(0);
     try {
       const transcript = await recognizeSpeech(audioData, language, language);
 
@@ -148,7 +194,7 @@ const SpeechToText = () => {
         )
       );
     } finally {
-      setIsLoading(false);
+      setIsTranscribing(false);
     }
   }, [audioData, language]);
 
@@ -174,7 +220,7 @@ const SpeechToText = () => {
 
     setErrorMessage("");
     setSuccessMessage("");
-    setIsLoading(true);
+    setIsSubmittingFeedback(true);
     try {
       await sendFeedback(
         feedbackValue,
@@ -198,7 +244,7 @@ const SpeechToText = () => {
         )
       );
     } finally {
-      setIsLoading(false);
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -212,9 +258,16 @@ const SpeechToText = () => {
     setShowFeedback(false);
     setErrorMessage("");
     setSuccessMessage("");
+    setIsTranscribing(false);
+    setIsSubmittingFeedback(false);
+    setLoadingSeconds(0);
   };
 
   const activeStep = textOutput ? 4 : audioData ? 3 : 1;
+  const currentProgressStage = getActiveProgressStage(
+    loadingSeconds,
+    TRANSCRIPTION_PROGRESS_STAGES
+  );
 
   return (
     <>
@@ -259,7 +312,10 @@ const SpeechToText = () => {
             <StatusPill ready={!!audioData}>
               {!!audioData ? "Audio ready" : "Awaiting audio input"}
             </StatusPill>
-            <AudioInput onAudioSubmit={handleAudioLoad} isLoading={isLoading} />
+            <AudioInput
+              onAudioSubmit={handleAudioLoad}
+              isLoading={isTranscribing}
+            />
           </StepCard>
 
           <StepCard>
@@ -291,9 +347,9 @@ const SpeechToText = () => {
             <ButtonContainer>
               <GlassButton
                 onClick={handleAudioSubmit}
-                disabled={!audioData || isLoading}
+                disabled={!audioData || isTranscribing}
               >
-                {isLoading
+                {isTranscribing
                   ? "Transcribing..."
                   : textOutput
                   ? "Transcribe Again"
@@ -301,11 +357,48 @@ const SpeechToText = () => {
               </GlassButton>
               <GhostButton
                 onClick={resetFlow}
-                disabled={!audioData && !textOutput}
+                disabled={isTranscribing || isSubmittingFeedback}
               >
                 Reset
               </GhostButton>
             </ButtonContainer>
+            {isTranscribing && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="w-full rounded-xl p-4 flex flex-col gap-2"
+                style={{
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-pill)",
+                }}
+              >
+                <p className="m-0 text-sm font-semibold">{currentProgressStage.title}</p>
+                <p
+                  className="m-0 text-xs md:text-sm"
+                  style={{ color: "var(--color-muted)" }}
+                >
+                  {currentProgressStage.message}
+                </p>
+                <LinearProgress
+                  variant="determinate"
+                  value={currentProgressStage.progress}
+                  color="inherit"
+                  sx={{
+                    borderRadius: "999px",
+                    backgroundColor: "var(--color-surface)",
+                    "& .MuiLinearProgress-bar": {
+                      backgroundColor: "var(--color-accent)",
+                    },
+                  }}
+                />
+                <p
+                  className="m-0 text-xs md:text-sm"
+                  style={{ color: "var(--color-muted)" }}
+                >
+                  Elapsed time: {loadingSeconds}s
+                </p>
+              </div>
+            )}
           </StepCard>
         </WorkflowPanel>
 
@@ -331,7 +424,7 @@ const SpeechToText = () => {
               placeholder="Your recognized text will appear here."
               text={textOutput}
               setText={setTextOutput}
-              isLoading={isLoading}
+              isLoading={isTranscribing}
             />
             {audioData && (
               <Footer
@@ -345,7 +438,10 @@ const SpeechToText = () => {
               <>
                 <TranscriptToolbar>
                   <StatusPill ready={!!textOutput}>Transcript ready</StatusPill>
-                  <GhostButton onClick={() => setShowFeedback((prev) => !prev)}>
+                  <GhostButton
+                    onClick={() => setShowFeedback((prev) => !prev)}
+                    disabled={isSubmittingFeedback}
+                  >
                     {showFeedback ? "Hide Feedback" : "Share Feedback"}
                   </GhostButton>
                 </TranscriptToolbar>
@@ -376,8 +472,13 @@ const SpeechToText = () => {
                       value={feedback}
                       onChange={(e) => setFeedback(e.target.value)}
                     />
-                    <GlassButton onClick={handleFeedbackSubmit} disabled={isLoading}>
-                      Submit Feedback
+                    <GlassButton
+                      onClick={handleFeedbackSubmit}
+                      disabled={isSubmittingFeedback}
+                    >
+                      {isSubmittingFeedback
+                        ? "Submitting..."
+                        : "Submit Feedback"}
                     </GlassButton>
                   </FeedbackContainer>
                 )}
