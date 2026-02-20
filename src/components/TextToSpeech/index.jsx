@@ -37,7 +37,6 @@ import StatusBanner from "../StatusBanner";
 
 const DEFAULT_SPEAKER_ID = "248";
 const MAX_TEXT_LENGTH = 600;
-const LONG_WAIT_THRESHOLD_SECONDS = 12;
 const SPEAKER_OPTIONS = [
   { value: "241", label: "241: Acholi (female)" },
   { value: "242", label: "242: Ateso (female)" },
@@ -46,6 +45,34 @@ const SPEAKER_OPTIONS = [
   { value: "246", label: "246: Swahili (male)" },
   { value: "248", label: "248: Luganda (female)" },
 ];
+const SYNTHESIS_PROGRESS_STAGES = [
+  {
+    minSeconds: 0,
+    progress: 30,
+    title: "Stage 1 of 3: Sending text",
+    message: "Submitting your text and speaker choice to the service.",
+  },
+  {
+    minSeconds: 8,
+    progress: 65,
+    title: "Stage 2 of 3: Synthesizing voice",
+    message: "The model is generating speech audio.",
+  },
+  {
+    minSeconds: 20,
+    progress: 92,
+    title: "Stage 3 of 3: Finalizing audio",
+    message: "Still working. Cold starts can make this step take longer.",
+  },
+];
+
+const getActiveProgressStage = (elapsedSeconds, stages) =>
+  stages.reduce((activeStage, stage) => {
+    if (elapsedSeconds >= stage.minSeconds) {
+      return stage;
+    }
+    return activeStage;
+  }, stages[0]);
 
 const TextToSpeech = () => {
   const [textInput, setTextInput] = useState("");
@@ -137,10 +164,10 @@ const TextToSpeech = () => {
   };
 
   const activeStep = audioUrl ? 3 : safeText ? 2 : 1;
-  const isTakingLong = loadingSeconds >= LONG_WAIT_THRESHOLD_SECONDS;
-  const loadingText = isTakingLong
-    ? "This is taking longer than expected, but we are still generating your audio."
-    : "Generating your audio now.";
+  const currentProgressStage = getActiveProgressStage(
+    loadingSeconds,
+    SYNTHESIS_PROGRESS_STAGES
+  );
 
   return (
     <>
@@ -243,17 +270,18 @@ const TextToSpeech = () => {
 
             {isLoading && (
               <LoadingNotice role="status" aria-live="polite">
-                <LoadingTitle>{loadingText}</LoadingTitle>
+                <LoadingTitle>{currentProgressStage.title}</LoadingTitle>
+                <LoadingMeta>{currentProgressStage.message}</LoadingMeta>
                 <LoadingMeta>Elapsed time: {loadingSeconds}s</LoadingMeta>
                 <LinearProgress
+                  variant="determinate"
+                  value={currentProgressStage.progress}
                   color="inherit"
                   sx={{
                     borderRadius: "999px",
                     backgroundColor: "var(--color-surface)",
                     "& .MuiLinearProgress-bar": {
-                      backgroundColor: isTakingLong
-                        ? "var(--color-accent)"
-                        : "var(--color-accent)",
+                      backgroundColor: "var(--color-accent)",
                     },
                   }}
                 />
