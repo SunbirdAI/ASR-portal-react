@@ -1,7 +1,7 @@
 const FEEDBACK_URL = import.meta.env.VITE_FEEDBACK_URL;
 export const tracking_id = import.meta.env.VITE_GA4_TRACKING_ID;
 
-const asrUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/stt`;
+const asrUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/audio/transcriptions`;
 const ttsUrl =
   import.meta.env.VITE_SB_TTS_URL ||
   "https://sb-modal-ws--spark-tts-salt-sparktts-generate.modal.run";
@@ -148,14 +148,13 @@ const requestBlob = async (
 };
 
 /**
- * Recognizes speech from an audio file and returns the transcribed text.
+ * Recognizes speech through the unified 51-language ASR endpoint.
+ * The language must be one of the supported ISO 639-3 codes.
  */
-export async function recognizeSpeech(audioData, languageCode, adapterCode) {
+export async function recognizeSpeech(audioData, languageCode) {
   const formData = new FormData();
   formData.append("audio", audioData);
   formData.append("language", languageCode);
-  formData.append("adapter", adapterCode);
-  formData.append("whisper", true);
 
   return requestJson(
     asrUrl,
