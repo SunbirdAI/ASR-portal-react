@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import LinearProgress from "@mui/material/LinearProgress";
 import { recognizeSpeech, sendFeedback } from "../../API";
+import { ASR_LANGUAGE_OPTIONS } from "../../lib/asr-languages";
 import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
 import { getUserFacingErrorMessage } from "../../lib/error-utils";
 import AudioInput from "../AudioInput";
@@ -33,49 +34,6 @@ import {
   TranscriptToolbar,
   WorkflowPanel,
 } from "./SpeechToText.styles";
-
-const sourceOptions = [
-  {
-    label: "Luganda",
-    value: "lug",
-  },
-  {
-    label: "Acholi",
-    value: "ach",
-  },
-  {
-    label: "Ateso",
-    value: "teo",
-  },
-  {
-    label: "Lugbara",
-    value: "lgg",
-  },
-  {
-    label: "Runyankole",
-    value: "nyn",
-  },
-  {
-    label: "English",
-    value: "eng",
-  },
-  {
-    label: "Swahili",
-    value: "swa",
-  },
-  {
-    label: "Kinyarwanda",
-    value: "kin",
-  },
-  {
-    label: "Lusoga",
-    value: "xog",
-  },
-  {
-    label: "Lumasaba",
-    value: "myx",
-  },
-];
 
 const TRANSCRIPTION_PROGRESS_STAGES = [
   {
@@ -168,7 +126,7 @@ const SpeechToText = () => {
     setIsTranscribing(true);
     setLoadingSeconds(0);
     try {
-      const transcript = await recognizeSpeech(audioData, language, language);
+      const transcript = await recognizeSpeech(audioData, language);
 
       if (transcript.audio_transcription) {
         TrackGoogleAnalyticsEvent(
@@ -310,7 +268,7 @@ const SpeechToText = () => {
               new recording.
             </StepDescription>
             <StatusPill ready={!!audioData}>
-              {!!audioData ? "Audio ready" : "Awaiting audio input"}
+              {audioData ? "Audio ready" : "Awaiting audio input"}
             </StatusPill>
             <AudioInput
               onAudioSubmit={handleAudioLoad}
@@ -330,8 +288,8 @@ const SpeechToText = () => {
               onChange={onLanguageChange}
               value={language}
             >
-              {sourceOptions.map((option, index) => (
-                <option key={index} value={option.value}>
+              {ASR_LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}

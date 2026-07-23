@@ -8,7 +8,9 @@ ASR Frontend Portal is a Vite-powered React application designed for performing 
 
 - **Fast Development** with Vite
 - **React Router** for seamless navigation
-- **Speech-to-Text** API integration with `api.sunbird.ai`
+- **Speech-to-Text** integration with Sunbird AI's unified
+  `/tasks/audio/transcriptions` endpoint
+- **51 African languages** supported with required ISO 639-3 language selection
 
 ## Tech Stack
 
