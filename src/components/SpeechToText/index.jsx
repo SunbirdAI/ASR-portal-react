@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
+import Autocomplete, {
+  createFilterOptions,
+} from "@mui/material/Autocomplete";
 import LinearProgress from "@mui/material/LinearProgress";
+import TextField from "@mui/material/TextField";
 import { recognizeSpeech, sendFeedback } from "../../API";
 import { ASR_LANGUAGE_OPTIONS } from "../../lib/asr-languages";
 import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
@@ -16,7 +20,6 @@ import {
   FeedbackTextarea,
   GlassButton,
   GhostButton,
-  LanguageDropdown,
   Note,
   NoteText,
   ProgressStep,
@@ -34,6 +37,10 @@ import {
   TranscriptToolbar,
   WorkflowPanel,
 } from "./SpeechToText.styles";
+
+const filterLanguageOptions = createFilterOptions({
+  stringify: (option) => `${option.label} ${option.value}`,
+});
 
 const TRANSCRIPTION_PROGRESS_STAGES = [
   {
@@ -167,8 +174,10 @@ const SpeechToText = () => {
     });
   }, []);
 
-  const onLanguageChange = (event) => {
-    setLanguage(event.target.value);
+  const onLanguageChange = (_event, selectedOption) => {
+    if (selectedOption) {
+      setLanguage(selectedOption.value);
+    }
   };
 
   const handleFeedbackSubmit = async () => {
@@ -283,17 +292,102 @@ const SpeechToText = () => {
               Choose the language spoken in the audio for accurate
               transcription.
             </StepDescription>
-            <LanguageDropdown
-              aria-label="Select transcription language"
+            <Autocomplete
+              autoHighlight
+              disableClearable
+              filterOptions={filterLanguageOptions}
+              getOptionLabel={(option) => option.label}
+              isOptionEqualToValue={(option, value) =>
+                option.value === value.value
+              }
+              noOptionsText="No supported language found."
               onChange={onLanguageChange}
-              value={language}
-            >
-              {ASR_LANGUAGE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </LanguageDropdown>
+              openOnFocus
+              options={ASR_LANGUAGE_OPTIONS}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  helperText="Search by language name or ISO code."
+                  label="Search language"
+                  placeholder="e.g. Luganda or lug"
+                />
+              )}
+              renderOption={(props, option) => {
+                const optionProps = { ...props };
+                delete optionProps.key;
+
+                return (
+                  <li
+                    key={option.value}
+                    {...optionProps}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "1rem",
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    <span
+                      style={{
+                        color: "var(--color-muted)",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {option.value}
+                    </span>
+                  </li>
+                );
+              }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    color: "var(--color-text)",
+                    backgroundColor: "var(--color-surface)",
+                    border: "1px solid var(--color-border)",
+                    boxShadow: "var(--color-elev-shadow)",
+                  },
+                },
+              }}
+              sx={{
+                my: 1,
+                "& .MuiFormHelperText-root": {
+                  color: "var(--color-muted)",
+                  mx: 0,
+                },
+                "& .MuiInputLabel-root": {
+                  color: "var(--color-muted)",
+                },
+                "& .MuiInputLabel-root.Mui-focused": {
+                  color: "var(--color-accent)",
+                },
+                "& .MuiOutlinedInput-root": {
+                  color: "var(--color-text)",
+                  backgroundColor: "var(--color-surface)",
+                  borderRadius: "0.75rem",
+                  "& fieldset": {
+                    borderColor: "var(--color-border)",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "var(--color-accent)",
+                  },
+                  "&.Mui-focused": {
+                    backgroundColor: "var(--color-accent-soft)",
+                    boxShadow: "0 0 0 3px var(--color-focus-ring)",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: "var(--color-accent)",
+                  },
+                },
+                "& .MuiSvgIcon-root": {
+                  color: "var(--color-text)",
+                },
+              }}
+              value={
+                ASR_LANGUAGE_OPTIONS.find(
+                  (option) => option.value === language
+                ) || ASR_LANGUAGE_OPTIONS[0]
+              }
+            />
           </StepCard>
 
           <StepCard>
