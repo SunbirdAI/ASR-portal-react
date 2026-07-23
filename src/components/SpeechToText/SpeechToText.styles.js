@@ -15,31 +15,6 @@ export const MainContainer = styled.div`
   }
 `;
 
-export const LanguageDropdown = styled.select`
-  ${tw`
-    w-full
-    px-4
-    py-3
-    my-2
-    border
-    rounded-xl
-    bg-white
-    text-black
-    transition
-    duration-200
-    ease-in-out
-    outline-none
-  `}
-  background: var(--color-surface);
-  color: var(--color-text);
-  border-color: var(--color-border);
-  &:focus {
-    border-color: var(--color-accent);
-    background: var(--color-accent-soft);
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
-  }
-`;
-
 export const ResponsiveContainer = styled.div`
   ${tw`w-full flex flex-col gap-4 p-4 rounded-2xl`}
   background: var(--color-surface);
