@@ -1,8 +1,9 @@
-# ASR Frontend Portal
+# Speech Studio Frontend
 
 ## Description
 
-ASR Frontend Portal is a Vite-powered React application designed for performing transcriptions of Ugandan languages. It integrates with `Sunbird AI's` ASR API for efficient speech-to-text conversion.
+Speech Studio is a Vite-powered React application for transcribing audio and
+generating speech with Sunbird AI's multilingual APIs.
 
 ## Features
 
@@ -10,7 +11,10 @@ ASR Frontend Portal is a Vite-powered React application designed for performing 
 - **React Router** for seamless navigation
 - **Speech-to-Text** integration with Sunbird AI's unified
   `/tasks/audio/transcriptions` endpoint
-- **51 African languages** supported with required ISO 639-3 language selection
+- **Text-to-Speech** integration with the unified `/tasks/audio/speech`
+  endpoint and live `/tasks/voice/speakers` catalog
+- **Searchable language selection** for 51 ASR languages and 20 TTS model
+  languages
 
 ## Tech Stack
 

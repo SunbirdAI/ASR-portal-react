@@ -1,7 +1,14 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import LinearProgress from "@mui/material/LinearProgress";
-import { generateSpeech } from "../../API";
+import TextField from "@mui/material/TextField";
+import { generateSpeech, getSpeechVoices } from "../../API";
 import { getUserFacingErrorMessage } from "../../lib/error-utils";
+import {
+  DEFAULT_TTS_LANGUAGE,
+  getTtsLanguage,
+  TTS_LANGUAGE_OPTIONS,
+} from "../../lib/tts-languages";
 import {
   ButtonContainer,
   DynamicMainContainer,
@@ -35,22 +42,16 @@ import {
 } from "./TextToSpeech.styles";
 import StatusBanner from "../StatusBanner";
 
-const DEFAULT_SPEAKER_ID = "248";
 const MAX_TEXT_LENGTH = 600;
-const SPEAKER_OPTIONS = [
-  { value: "241", label: "241: Acholi (female)" },
-  { value: "242", label: "242: Ateso (female)" },
-  { value: "243", label: "243: Runyankore (female)" },
-  { value: "245", label: "245: Lugbara (female)" },
-  { value: "246", label: "246: Swahili (male)" },
-  { value: "248", label: "248: Luganda (female)" },
-];
+const filterLanguageOptions = createFilterOptions({
+  stringify: (option) => `${option.label} ${option.value}`,
+});
 const SYNTHESIS_PROGRESS_STAGES = [
   {
     minSeconds: 0,
     progress: 30,
     title: "Stage 1 of 3: Sending text",
-    message: "Submitting your text and speaker choice to the service.",
+    message: "Submitting your text, language, and voice to the service.",
   },
   {
     minSeconds: 8,
@@ -74,22 +75,52 @@ const getActiveProgressStage = (elapsedSeconds, stages) =>
     return activeStage;
   }, stages[0]);
 
+const formatVoiceLabel = (voice, index) => {
+  const source = voice.split("_")[0]?.toUpperCase() || "TTS";
+  return `${source} voice ${index + 1} (${voice})`;
+};
+
 const TextToSpeech = () => {
   const [textInput, setTextInput] = useState("");
-  const [speakerId, setSpeakerId] = useState(DEFAULT_SPEAKER_ID);
+  const [language, setLanguage] = useState(DEFAULT_TTS_LANGUAGE);
+  const [voice, setVoice] = useState("");
+  const [voiceCatalog, setVoiceCatalog] = useState({});
+  const [isLoadingVoices, setIsLoadingVoices] = useState(true);
+  const [voiceCatalogMessage, setVoiceCatalogMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
+  const [speechResult, setSpeechResult] = useState(null);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loadingSeconds, setLoadingSeconds] = useState(0);
 
   useEffect(() => {
-    return () => {
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
+    let isActive = true;
+
+    const loadVoices = async () => {
+      try {
+        const response = await getSpeechVoices();
+        if (!isActive) return;
+        setVoiceCatalog(response.by_language || {});
+      } catch (error) {
+        console.error("Unable to load TTS voices:", error);
+        if (!isActive) return;
+        setVoiceCatalogMessage(
+          "Voice choices could not be loaded. The service will select a voice automatically.",
+        );
+      } finally {
+        if (isActive) {
+          setIsLoadingVoices(false);
+        }
       }
     };
-  }, [audioUrl]);
+
+    loadVoices();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isLoading) {
@@ -105,6 +136,24 @@ const TextToSpeech = () => {
   }, [isLoading]);
 
   const safeText = textInput.trim();
+  const selectedLanguage = getTtsLanguage(language) || TTS_LANGUAGE_OPTIONS[0];
+  const availableVoices = voiceCatalog[language] || [];
+  const isLanguageUnavailable = (option) => {
+    if (isLoadingVoices || voiceCatalogMessage) {
+      return Boolean(option.voiceUnavailable);
+    }
+
+    return !voiceCatalog[option.value]?.length;
+  };
+
+  const handleLanguageChange = (_event, selectedOption) => {
+    if (!selectedOption) return;
+    setLanguage(selectedOption.value);
+    setVoice("");
+    setAudioUrl("");
+    setSpeechResult(null);
+    setMessage("");
+  };
 
   const handleGenerate = async () => {
     if (!safeText) {
@@ -119,22 +168,17 @@ const TextToSpeech = () => {
     setLoadingSeconds(0);
 
     try {
-      const audioBlob = await generateSpeech(safeText, speakerId);
-      const nextAudioUrl = URL.createObjectURL(audioBlob);
-      setAudioUrl((previousAudioUrl) => {
-        if (previousAudioUrl) {
-          URL.revokeObjectURL(previousAudioUrl);
-        }
-        return nextAudioUrl;
-      });
+      const response = await generateSpeech(safeText, { language, voice });
+      setAudioUrl(response.audio_url);
+      setSpeechResult(response);
       setMessage("Speech generated successfully.");
     } catch (error) {
       console.error(error);
       setErrorMessage(
         getUserFacingErrorMessage(
           error,
-          "Unable to generate speech right now. Please try again."
-        )
+          "Unable to generate speech right now. Please try again.",
+        ),
       );
     } finally {
       setIsLoading(false);
@@ -147,39 +191,48 @@ const TextToSpeech = () => {
     const downloadLink = document.createElement("a");
     downloadLink.href = audioUrl;
     downloadLink.download = `sunbird_tts_${Date.now()}.wav`;
+    downloadLink.rel = "noopener";
+    document.body.appendChild(downloadLink);
     downloadLink.click();
+    downloadLink.remove();
   };
 
   const handleReset = () => {
     setTextInput("");
-    setSpeakerId(DEFAULT_SPEAKER_ID);
+    setLanguage(DEFAULT_TTS_LANGUAGE);
+    setVoice("");
     setMessage("");
     setErrorMessage("");
-    setAudioUrl((previousAudioUrl) => {
-      if (previousAudioUrl) {
-        URL.revokeObjectURL(previousAudioUrl);
-      }
-      return "";
-    });
+    setAudioUrl("");
+    setSpeechResult(null);
   };
 
   const activeStep = audioUrl ? 3 : safeText ? 2 : 1;
   const currentProgressStage = getActiveProgressStage(
     loadingSeconds,
-    SYNTHESIS_PROGRESS_STAGES
+    SYNTHESIS_PROGRESS_STAGES,
   );
+  const resultLanguage = speechResult?.language
+    ? getTtsLanguage(speechResult.language)?.label || speechResult.language
+    : selectedLanguage.label;
+  const resultDuration = Number(speechResult?.duration_seconds);
 
   return (
     <>
       <ResponsiveContainer>
         <SectionHeading>Speech Synthesis Workflow</SectionHeading>
         <SectionSubtext>
-          Write text, pick a speaker voice, and generate production-ready audio.
+          Write text, search for a language, choose a voice, and generate
+          production-ready audio.
         </SectionSubtext>
         <ProgressTrack aria-label="Text-to-speech progress">
           <ProgressStep active={activeStep >= 1}>1. Write text</ProgressStep>
-          <ProgressStep active={activeStep >= 2}>2. Select voice</ProgressStep>
-          <ProgressStep active={activeStep >= 3}>3. Generate audio</ProgressStep>
+          <ProgressStep active={activeStep >= 2}>
+            2. Select language and voice
+          </ProgressStep>
+          <ProgressStep active={activeStep >= 3}>
+            3. Generate audio
+          </ProgressStep>
         </ProgressTrack>
       </ResponsiveContainer>
 
@@ -208,29 +261,148 @@ const TextToSpeech = () => {
 
           <StepCard>
             <StepMeta>Step 2</StepMeta>
-            <StepTitle>Select speaker voice</StepTitle>
+            <StepTitle>Select language and voice</StepTitle>
             <StepDescription>
-              Choose a speaker profile for voice generation.
+              Search the multilingual catalog, then optionally choose a specific
+              speaker voice.
             </StepDescription>
+            <Autocomplete
+              autoHighlight
+              disableClearable
+              filterOptions={filterLanguageOptions}
+              getOptionDisabled={isLanguageUnavailable}
+              getOptionLabel={(option) => option.label}
+              isOptionEqualToValue={(option, value) =>
+                option.value === value.value
+              }
+              noOptionsText="No supported language found."
+              onChange={handleLanguageChange}
+              openOnFocus
+              options={TTS_LANGUAGE_OPTIONS}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  helperText="Search 20 model languages by name or ISO code. Languages without an available voice are marked."
+                  label="Search language"
+                  placeholder="e.g. Yoruba or yor"
+                />
+              )}
+              renderOption={(props, option) => {
+                const optionProps = { ...props };
+                delete optionProps.key;
+                const unavailable = isLanguageUnavailable(option);
+
+                return (
+                  <li
+                    key={option.value}
+                    {...optionProps}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "1rem",
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    <span
+                      style={{
+                        alignItems: "flex-end",
+                        color: "var(--color-muted)",
+                        display: "flex",
+                        flexDirection: "column",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {option.value}
+                      {unavailable && (
+                        <small style={{ fontFamily: "inherit" }}>
+                          voice unavailable
+                        </small>
+                      )}
+                    </span>
+                  </li>
+                );
+              }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    color: "var(--color-text)",
+                    backgroundColor: "var(--color-surface)",
+                    border: "1px solid var(--color-border)",
+                    boxShadow: "var(--color-elev-shadow)",
+                  },
+                },
+              }}
+              sx={{
+                my: 1,
+                "& .MuiFormHelperText-root": {
+                  color: "var(--color-muted)",
+                  mx: 0,
+                },
+                "& .MuiInputLabel-root": {
+                  color: "var(--color-muted)",
+                },
+                "& .MuiInputLabel-root.Mui-focused": {
+                  color: "var(--color-accent)",
+                },
+                "& .MuiOutlinedInput-root": {
+                  color: "var(--color-text)",
+                  backgroundColor: "var(--color-surface)",
+                  borderRadius: "0.75rem",
+                  "& fieldset": {
+                    borderColor: "var(--color-border)",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "var(--color-accent)",
+                  },
+                  "&.Mui-focused": {
+                    backgroundColor: "var(--color-accent-soft)",
+                    boxShadow: "0 0 0 3px var(--color-focus-ring)",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: "var(--color-accent)",
+                  },
+                },
+                "& .MuiSvgIcon-root": {
+                  color: "var(--color-text)",
+                },
+              }}
+              value={selectedLanguage}
+            />
+
             <FieldGroup>
-              <FieldLabel htmlFor="tts-speaker-id">Speaker</FieldLabel>
+              <FieldLabel htmlFor="tts-voice">Voice</FieldLabel>
               <SpeakerSelect
-                id="tts-speaker-id"
-                value={speakerId}
-                onChange={(event) => setSpeakerId(event.target.value)}
+                id="tts-voice"
+                value={voice}
+                disabled={isLoadingVoices}
+                onChange={(event) => setVoice(event.target.value)}
               >
-                {SPEAKER_OPTIONS.map((speaker) => (
-                  <option key={speaker.value} value={speaker.value}>
-                    {speaker.label}
+                <option value="">
+                  {isLoadingVoices
+                    ? "Loading voices..."
+                    : "Automatic voice (recommended)"}
+                </option>
+                {availableVoices.map((voiceOption, index) => (
+                  <option key={voiceOption} value={voiceOption}>
+                    {formatVoiceLabel(voiceOption, index)}
                   </option>
                 ))}
               </SpeakerSelect>
               <FieldHint>
-                Default speaker is <strong>248: Luganda (female)</strong>.
+                {voiceCatalogMessage ||
+                  (availableVoices.length
+                    ? `${availableVoices.length} speaker ${
+                        availableVoices.length === 1 ? "voice" : "voices"
+                      } available for ${selectedLanguage.label}.`
+                    : "Sunbird will select the best available voice for this language.")}
               </FieldHint>
             </FieldGroup>
 
-            <StatusPill ready={Boolean(safeText)}>Text ready for synthesis</StatusPill>
+            <StatusPill ready={Boolean(safeText)}>
+              {safeText
+                ? `${selectedLanguage.label} text ready for synthesis`
+                : "Enter text to continue"}
+            </StatusPill>
             <ButtonContainer>
               <GlassButton
                 type="button"
@@ -259,9 +431,18 @@ const TextToSpeech = () => {
             </StepDescription>
 
             {audioUrl ? (
-              <AudioPreview controls src={audioUrl}>
-                Your browser does not support the audio element.
-              </AudioPreview>
+              <>
+                <AudioPreview controls src={audioUrl}>
+                  Your browser does not support the audio element.
+                </AudioPreview>
+                <FieldHint>
+                  {resultLanguage}
+                  {speechResult?.voice ? ` · ${speechResult.voice}` : ""}
+                  {Number.isFinite(resultDuration)
+                    ? ` · ${resultDuration.toFixed(1)}s`
+                    : ""}
+                </FieldHint>
+              </>
             ) : (
               <PlaceholderCard>
                 Generated speech will appear here after synthesis.
