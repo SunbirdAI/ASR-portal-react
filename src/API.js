@@ -2,9 +2,8 @@ const FEEDBACK_URL = import.meta.env.VITE_FEEDBACK_URL;
 export const tracking_id = import.meta.env.VITE_GA4_TRACKING_ID;
 
 const asrUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/audio/transcriptions`;
-const ttsUrl =
-  import.meta.env.VITE_SB_TTS_URL ||
-  "https://sb-modal-ws--spark-tts-salt-sparktts-generate.modal.run";
+const ttsUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/audio/speech`;
+const ttsVoicesUrl = `${import.meta.env.VITE_SB_API_URL}/tasks/voice/speakers`;
 const asrDbUrl = `${import.meta.env.VITE_SB_API_URL}/transcriptions`;
 const REQUEST_TIMEOUT_MS = 45000;
 const NO_REQUEST_TIMEOUT = 0;
@@ -122,31 +121,6 @@ const requestJson = async (url, options, fallbackMessage, timeoutMs = REQUEST_TI
   }
 };
 
-const requestBlob = async (
-  url,
-  options,
-  fallbackMessage,
-  timeoutMs = REQUEST_TIMEOUT_MS
-) => {
-  try {
-    const response = await fetchWithTimeout(url, options, timeoutMs);
-
-    if (!response.ok) {
-      const payload = await parseResponsePayload(response);
-      const statusFallback = mapStatusToMessage(response.status, fallbackMessage);
-      throw new Error(toErrorMessage(payload, statusFallback));
-    }
-
-    const blob = await response.blob();
-    if (!blob.size) {
-      throw new Error("The service returned an empty file. Please try again.");
-    }
-    return blob;
-  } catch (error) {
-    throw normalizeRequestError(error, fallbackMessage);
-  }
-};
-
 /**
  * Recognizes speech through the unified 51-language ASR endpoint.
  * The language must be one of the supported ISO 639-3 codes.
@@ -172,31 +146,70 @@ export async function recognizeSpeech(audioData, languageCode) {
 }
 
 /**
- * Generates speech audio from text.
+ * Generates speech through the unified multilingual TTS endpoint.
  */
-export async function generateSpeech(text, speakerID = "248") {
+export async function generateSpeech(
+  text,
+  { language = "lug", voice = "" } = {}
+) {
   const normalizedText = text?.trim();
-  const normalizedSpeakerID = `${speakerID || "248"}`.trim();
+  const normalizedLanguage = language?.trim().toLowerCase();
+  const normalizedVoice = voice?.trim();
 
   if (!normalizedText) {
     throw new Error("Please enter text before generating speech.");
   }
 
-  const queryParams = new URLSearchParams({
-    text: normalizedText,
-    speaker_id: normalizedSpeakerID || "248",
-  });
+  if (!normalizedLanguage) {
+    throw new Error("Please select a language before generating speech.");
+  }
 
-  return requestBlob(
-    `${ttsUrl}?${queryParams.toString()}`,
+  const requestBody = {
+    text: normalizedText,
+    language: normalizedLanguage,
+    response_mode: "url",
+  };
+
+  if (normalizedVoice) {
+    requestBody.voice = normalizedVoice;
+  }
+
+  const response = await requestJson(
+    ttsUrl,
     {
       method: "POST",
       headers: {
-        Accept: "audio/wav, audio/*, */*",
+        Authorization: `Bearer ${getAuthToken()}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify(requestBody),
     },
     "Unable to generate speech right now. Please try again.",
     NO_REQUEST_TIMEOUT
+  );
+
+  if (!response.audio_url) {
+    throw new Error("The speech service did not return an audio file.");
+  }
+
+  return response;
+}
+
+/**
+ * Loads the current TTS voice catalog grouped by ISO 639-3 language code.
+ */
+export async function getSpeechVoices() {
+  return requestJson(
+    ttsVoicesUrl,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+        Accept: "application/json",
+      },
+    },
+    "Unable to load the available voices right now."
   );
 }
 
