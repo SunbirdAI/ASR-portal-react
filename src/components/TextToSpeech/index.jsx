@@ -138,13 +138,6 @@ const TextToSpeech = () => {
   const safeText = textInput.trim();
   const selectedLanguage = getTtsLanguage(language) || TTS_LANGUAGE_OPTIONS[0];
   const availableVoices = voiceCatalog[language] || [];
-  const isLanguageUnavailable = (option) => {
-    if (isLoadingVoices || voiceCatalogMessage) {
-      return Boolean(option.voiceUnavailable);
-    }
-
-    return !voiceCatalog[option.value]?.length;
-  };
 
   const handleLanguageChange = (_event, selectedOption) => {
     if (!selectedOption) return;
@@ -270,7 +263,6 @@ const TextToSpeech = () => {
               autoHighlight
               disableClearable
               filterOptions={filterLanguageOptions}
-              getOptionDisabled={isLanguageUnavailable}
               getOptionLabel={(option) => option.label}
               isOptionEqualToValue={(option, value) =>
                 option.value === value.value
@@ -282,7 +274,7 @@ const TextToSpeech = () => {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  helperText="Search 20 model languages by name or ISO code. Languages without an available voice are marked."
+                  helperText={`Search ${TTS_LANGUAGE_OPTIONS.length} supported languages by name or ISO code.`}
                   label="Search language"
                   placeholder="e.g. Yoruba or yor"
                 />
@@ -290,7 +282,6 @@ const TextToSpeech = () => {
               renderOption={(props, option) => {
                 const optionProps = { ...props };
                 delete optionProps.key;
-                const unavailable = isLanguageUnavailable(option);
 
                 return (
                   <li
@@ -305,19 +296,11 @@ const TextToSpeech = () => {
                     <span>{option.label}</span>
                     <span
                       style={{
-                        alignItems: "flex-end",
                         color: "var(--color-muted)",
-                        display: "flex",
-                        flexDirection: "column",
                         fontFamily: "monospace",
                       }}
                     >
                       {option.value}
-                      {unavailable && (
-                        <small style={{ fontFamily: "inherit" }}>
-                          voice unavailable
-                        </small>
-                      )}
                     </span>
                   </li>
                 );

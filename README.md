@@ -13,7 +13,7 @@ generating speech with Sunbird AI's multilingual APIs.
   `/tasks/audio/transcriptions` endpoint
 - **Text-to-Speech** integration with the unified `/tasks/audio/speech`
   endpoint and live `/tasks/voice/speakers` catalog
-- **Searchable language selection** for 51 ASR languages and 20 TTS model
+- **Searchable language selection** for 51 ASR languages and 17 TTS voice
   languages
 
 ## Tech Stack
