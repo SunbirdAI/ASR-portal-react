@@ -1,126 +1,153 @@
-import React, { useCallback, useEffect, useState } from "react";
-import Autocomplete, {
-  createFilterOptions,
-} from "@mui/material/Autocomplete";
-import LinearProgress from "@mui/material/LinearProgress";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
+import LinearProgress from "@mui/material/LinearProgress";
 import { recognizeSpeech, sendFeedback } from "../../API";
 import { ASR_LANGUAGE_OPTIONS } from "../../lib/asr-languages";
 import { TrackGoogleAnalyticsEvent } from "../../lib/GoogleAnalyticsUtil";
 import { getUserFacingErrorMessage } from "../../lib/error-utils";
 import AudioInput from "../AudioInput";
-import Footer from "../Footer";
+import AudioPlayer from "../AudioPlayer/AudioPlayer";
 import TranscriptionTextArea from "../TranscriptionTextArea";
 import StatusBanner from "../StatusBanner";
 import {
-  ButtonContainer,
-  CloseButton,
-  DynamicMainContainer,
-  FeedbackContainer,
-  FeedbackTextarea,
-  GlassButton,
-  GhostButton,
-  Note,
-  NoteText,
-  ProgressStep,
-  ProgressTrack,
-  RatingStars,
-  ResponsiveContainer,
-  ResultPanel,
-  SectionHeading,
-  SectionSubtext,
-  StatusPill,
-  StepCard,
-  StepDescription,
-  StepMeta,
-  StepTitle,
-  TranscriptToolbar,
-  WorkflowPanel,
-} from "./SpeechToText.styles";
+  Sparkles,
+  RotateCcw,
+  CheckCircle2,
+  Star,
+  PlusCircle,
+  FileAudio,
+} from "lucide-react";
+
+const PREFERRED_LANGUAGE_KEY = "preferred_asr_language";
 
 const filterLanguageOptions = createFilterOptions({
-  stringify: (option) => `${option.label} ${option.value}`,
+  stringify: (option) =>
+    `${option.label} ${option.native || ""} ${option.value} ${option.region || ""}`,
 });
 
 const TRANSCRIPTION_PROGRESS_STAGES = [
   {
     minSeconds: 0,
     progress: 30,
-    title: "Stage 1 of 3: Uploading audio",
-    message: "Preparing your request and sending audio to the server.",
+    title: "Uploading & Preparing Audio",
+    message: "Verifying audio format and transmitting to Sunbird AI inference cluster.",
   },
   {
-    minSeconds: 10,
+    minSeconds: 8,
     progress: 65,
-    title: "Stage 2 of 3: Transcribing speech",
-    message: "The model is processing your audio.",
+    title: "Recognizing African Speech",
+    message: "Running acoustic model and language decoder with timestamp alignment.",
   },
   {
-    minSeconds: 25,
+    minSeconds: 22,
     progress: 92,
-    title: "Stage 3 of 3: Finalizing result",
-    message: "Still working. Cold starts can make this step take longer.",
+    title: "Finalizing Transcripts",
+    message: "Formatting timestamps and preparing final segments.",
   },
 ];
 
-const getActiveProgressStage = (elapsedSeconds, stages) =>
-  stages.reduce((activeStage, stage) => {
-    if (elapsedSeconds >= stage.minSeconds) {
-      return stage;
-    }
+const getActiveProgressStage = (elapsedSeconds) =>
+  TRANSCRIPTION_PROGRESS_STAGES.reduce((activeStage, stage) => {
+    if (elapsedSeconds >= stage.minSeconds) return stage;
     return activeStage;
-  }, stages[0]);
+  }, TRANSCRIPTION_PROGRESS_STAGES[0]);
 
 const SpeechToText = () => {
-  const [language, setLanguage] = useState("lug");
+  const [language, setLanguage] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(PREFERRED_LANGUAGE_KEY) || "lug";
+    }
+    return "lug";
+  });
+
   const [textOutput, setTextOutput] = useState("");
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [timestamps, setTimestamps] = useState(null);
+  const [audioFileName, setAudioFileName] = useState("");
   const [audioSrc, setAudioSrc] = useState("");
   const [audioData, setAudioData] = useState(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [showNote, setShowNote] = useState(true);
-  const [feedback, setFeedback] = useState(""); // Feedback comments
-  const [rating, setRating] = useState(0); // Rating for transcription accuracy
-  const [transcriptionID, setTranscriptionID] = useState(null); // Store transcription ID
-  const [showFeedback, setShowFeedback] = useState(false);
+
+  // Audio synchronization
+  const [currentAudioTime, setCurrentAudioTime] = useState(0);
+  const [seekTargetTime, setSeekTargetTime] = useState(null);
+
+  // Status & feedback
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [transcriptionID, setTranscriptionID] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   useEffect(() => {
     return () => {
-      if (audioSrc) {
-        URL.revokeObjectURL(audioSrc);
-      }
+      if (audioSrc) URL.revokeObjectURL(audioSrc);
     };
   }, [audioSrc]);
 
   useEffect(() => {
     if (!isTranscribing) {
       setLoadingSeconds(0);
-      return undefined;
+      return;
     }
-
-    const intervalId = window.setInterval(() => {
-      setLoadingSeconds((previousSeconds) => previousSeconds + 1);
+    const timer = setInterval(() => {
+      setLoadingSeconds((prev) => prev + 1);
     }, 1000);
-
-    return () => window.clearInterval(intervalId);
+    return () => clearInterval(timer);
   }, [isTranscribing]);
 
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(textOutput);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 3000);
-    } catch (err) {
-      console.error("Failed to copy!", err);
-      setErrorMessage("Unable to copy text right now. Please copy manually.");
+  // Auto-scrolling refs
+  const studioRef = useRef(null);
+  const transcriptSectionRef = useRef(null);
+
+  // Auto-scroll to studio view as soon as transcribing begins
+  useEffect(() => {
+    if (isTranscribing && studioRef.current) {
+      const timer = setTimeout(() => {
+        studioRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isTranscribing]);
+
+  // When transcript arrives/shows, smoothly scroll it into full view
+  useEffect(() => {
+    if (textOutput && transcriptSectionRef.current) {
+      const timer = setTimeout(() => {
+        transcriptSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [textOutput]);
+
+  const handleAudioLoad = useCallback((data) => {
+    setAudioData(data);
+    setAudioFileName(data?.name || "audio_recording.wav");
+    const nextUrl = URL.createObjectURL(data);
+    setAudioSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return nextUrl;
+    });
+    setErrorMessage("");
+  }, []);
+
+  const handleLanguageChange = (_event, selectedOption) => {
+    if (selectedOption) {
+      setLanguage(selectedOption.value);
+      localStorage.setItem(PREFERRED_LANGUAGE_KEY, selectedOption.value);
     }
   };
 
-  const handleAudioSubmit = useCallback(async () => {
+  const handleTranscribe = useCallback(async () => {
     if (!audioData) return;
 
     TrackGoogleAnalyticsEvent(
@@ -128,34 +155,35 @@ const SpeechToText = () => {
       "Transcription Requested",
       "Transcribe Button"
     );
+
     setErrorMessage("");
     setSuccessMessage("");
     setIsTranscribing(true);
     setLoadingSeconds(0);
-    try {
-      const transcript = await recognizeSpeech(audioData, language);
 
-      if (transcript.audio_transcription) {
+    try {
+      const response = await recognizeSpeech(audioData, language);
+
+      if (response.audio_transcription) {
         TrackGoogleAnalyticsEvent(
           "Transcriptions",
           "Transcription Successful",
           "Transcribe Button"
         );
-        setTranscriptionID(transcript.audio_transcription_id); // Store transcription ID
-      }
-      setTextOutput(transcript.audio_transcription);
-      if (!transcript.audio_transcription) {
+        setTextOutput(response.audio_transcription);
+        setTimestamps(response.segments ?? null);
+        setTranscriptionID(response.audio_transcription_id || null);
+      } else {
         setErrorMessage(
-          "No speech was detected in this audio. Please try a clearer sample."
+          "No clear speech detected in this audio sample. Please test with a clearer recording."
         );
       }
-    } catch (e) {
-      console.error("Transcription error:", e);
-      setTextOutput("");
+    } catch (err) {
+      console.error("Transcription error:", err);
       setErrorMessage(
         getUserFacingErrorMessage(
-          e,
-          "Unable to transcribe audio right now. Please try again."
+          err,
+          "Unable to transcribe audio right now. Please verify your connection and try again."
         )
       );
     } finally {
@@ -163,384 +191,426 @@ const SpeechToText = () => {
     }
   }, [audioData, language]);
 
-  const handleAudioLoad = useCallback((audioData) => {
-    setAudioData(audioData);
-    const nextAudioSource = URL.createObjectURL(audioData);
-    setAudioSrc((previousAudioSource) => {
-      if (previousAudioSource) {
-        URL.revokeObjectURL(previousAudioSource);
-      }
-      return nextAudioSource;
-    });
-  }, []);
-
-  const onLanguageChange = (_event, selectedOption) => {
-    if (selectedOption) {
-      setLanguage(selectedOption.value);
-    }
+  const resetAll = () => {
+    setTextOutput("");
+    setTimestamps(null);
+    setAudioData(null);
+    setAudioFileName("");
+    if (audioSrc) URL.revokeObjectURL(audioSrc);
+    setAudioSrc("");
+    setErrorMessage("");
+    setSuccessMessage("");
+    setShowFeedback(false);
+    setRating(0);
+    setFeedbackComment("");
+    setTranscriptionID(null);
   };
 
   const handleFeedbackSubmit = async () => {
     if (!textOutput || !transcriptionID) return;
-
-    const feedbackValue = rating >= 4 ? "Good" : "Bad";
-
-    setErrorMessage("");
-    setSuccessMessage("");
     setIsSubmittingFeedback(true);
     try {
       await sendFeedback(
-        feedbackValue,
+        rating >= 4 ? "Good" : "Bad",
         "ASR_USER",
         language,
         textOutput,
         audioSrc,
         transcriptionID,
-        feedback
+        feedbackComment
       );
-      setSuccessMessage("Thank you. Your feedback has been submitted.");
-      setFeedback("");
-      setRating(0);
+      setSuccessMessage("Thank you! Your feedback helps train better models.");
       setShowFeedback(false);
-    } catch (e) {
-      console.error("Feedback error:", e);
-      setErrorMessage(
-        getUserFacingErrorMessage(
-          e,
-          "Unable to submit feedback right now. Please try again."
-        )
-      );
+      setRating(0);
+      setFeedbackComment("");
+    } catch {
+      setErrorMessage("Unable to submit feedback right now.");
     } finally {
       setIsSubmittingFeedback(false);
     }
   };
 
-  const resetFlow = () => {
-    setTextOutput("");
-    setAudioData(null);
-    setAudioSrc("");
-    setTranscriptionID(null);
-    setFeedback("");
-    setRating(0);
-    setShowFeedback(false);
-    setErrorMessage("");
-    setSuccessMessage("");
-    setIsTranscribing(false);
-    setIsSubmittingFeedback(false);
-    setLoadingSeconds(0);
-  };
+  const currentStage = getActiveProgressStage(loadingSeconds);
+  const selectedLangObj =
+    ASR_LANGUAGE_OPTIONS.find((l) => l.value === language) || ASR_LANGUAGE_OPTIONS[0];
 
-  const activeStep = textOutput ? 4 : audioData ? 3 : 1;
-  const currentProgressStage = getActiveProgressStage(
-    loadingSeconds,
-    TRANSCRIPTION_PROGRESS_STAGES
-  );
+  const hasResultOrInProgress = Boolean(textOutput || isTranscribing);
 
   return (
-    <>
-      {showNote && (
-        <Note>
-          <NoteText>
-            Audio files used here are saved for system improvement and model
-            retraining.
-          </NoteText>
-          <CloseButton
-            aria-label="Dismiss notice"
-            onClick={() => setShowNote(false)}
+    <div className="w-full flex flex-col gap-6">
+      {/* Notifications */}
+      <StatusBanner
+        type="error"
+        message={errorMessage}
+        onDismiss={() => setErrorMessage("")}
+      />
+      <StatusBanner
+        type="success"
+        message={successMessage}
+        onDismiss={() => setSuccessMessage("")}
+      />
+
+      {/* PHASE 1: Focused Intake View (When no transcript exists yet) */}
+      {!hasResultOrInProgress && (
+        <div className="w-full max-w-3xl mx-auto flex flex-col gap-5 transition-all duration-300">
+          {/* Audio Input Card */}
+          <div
+            className="rounded-3xl p-6 sm:p-8 border flex flex-col gap-5"
+            style={{
+              background: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+              boxShadow: "var(--color-elev-shadow)",
+            }}
           >
-            ✖
-          </CloseButton>
-        </Note>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold m-0" style={{ color: "var(--color-text)" }}>
+                  Upload or Record Speech
+                </h2>
+                <p className="text-xs m-0 mt-0.5" style={{ color: "var(--color-muted)" }}>
+                  Select an audio file or record directly from your microphone
+                </p>
+              </div>
+
+              {audioData && (
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full"
+                  style={{
+                    background: "var(--color-accent-soft)",
+                    color: "var(--color-accent)",
+                  }}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Audio Ready</span>
+                </span>
+              )}
+            </div>
+
+            <AudioInput onAudioSubmit={handleAudioLoad} isLoading={isTranscribing} />
+
+            {/* If audio was loaded, show player right here */}
+            {audioSrc && (
+              <div className="pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <AudioPlayer
+                  audioSrc={audioSrc}
+                  fileName={audioFileName}
+                  onTimeUpdate={setCurrentAudioTime}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Language Selection & Action Card */}
+          <div
+            className="rounded-3xl p-6 sm:p-7 border flex flex-col gap-4"
+            style={{
+              background: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+              boxShadow: "var(--color-elev-soft)",
+            }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
+                Source African Language
+              </label>
+
+              <Autocomplete
+                autoHighlight
+                disableClearable
+                filterOptions={filterLanguageOptions}
+                getOptionLabel={(option) => `${option.label} (${option.native || option.value})`}
+                isOptionEqualToValue={(option, value) => option.value === value.value}
+                onChange={handleLanguageChange}
+                options={ASR_LANGUAGE_OPTIONS}
+                value={selectedLangObj}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Search 51 African languages..."
+                    size="small"
+                  />
+                )}
+                renderOption={(props, option) => {
+                  const optProps = { ...props };
+                  delete optProps.key;
+                  return (
+                    <li
+                      key={option.value}
+                      {...optProps}
+                      className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{option.label}</span>
+                        {option.native && (
+                          <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                            {option.native} {option.region ? `· ${option.region}` : ""}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--color-pill)" }}>
+                        {option.value}
+                      </span>
+                    </li>
+                  );
+                }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      color: "var(--color-text)",
+                      backgroundColor: "var(--color-surface)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "0.75rem",
+                      boxShadow: "var(--color-elev-shadow)",
+                    },
+                  },
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "var(--color-text)",
+                    backgroundColor: "var(--color-pill)",
+                    borderRadius: "0.75rem",
+                    fontSize: "0.875rem",
+                    "& fieldset": { borderColor: "var(--color-border)" },
+                    "&:hover fieldset": { borderColor: "var(--color-accent)" },
+                    "&.Mui-focused fieldset": { borderColor: "var(--color-accent)" },
+                  },
+                }}
+              />
+            </div>
+
+            {/* Primary Action Button */}
+            <button
+              type="button"
+              onClick={handleTranscribe}
+              disabled={!audioData || isTranscribing}
+              className="w-full py-3.5 px-5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2.5 transition-all shadow-sm active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed mt-2"
+              style={{
+                background: "var(--color-accent)",
+                color: "#ffffff",
+              }}
+            >
+              <Sparkles size={16} />
+              <span>
+                Transcribe Audio in {selectedLangObj.label}
+              </span>
+            </button>
+          </div>
+        </div>
       )}
 
-      <ResponsiveContainer>
-        <SectionHeading>Transcription Workflow</SectionHeading>
-        <SectionSubtext>
-          Upload audio, choose the language, and transcribe with a clean,
-          guided flow.
-        </SectionSubtext>
-        <ProgressTrack aria-label="Transcription progress">
-          <ProgressStep active={activeStep >= 1}>1. Upload audio</ProgressStep>
-          <ProgressStep active={activeStep >= 2}>2. Choose language</ProgressStep>
-          <ProgressStep active={activeStep >= 3}>3. Run transcription</ProgressStep>
-          <ProgressStep active={activeStep >= 4}>4. Review result</ProgressStep>
-        </ProgressTrack>
-      </ResponsiveContainer>
-
-      <DynamicMainContainer hasFooter={!!audioData}>
-        <WorkflowPanel>
-          <StepCard>
-            <StepMeta>Step 1</StepMeta>
-            <StepTitle>Upload or record audio</StepTitle>
-            <StepDescription>
-              Drag and drop an audio file, or use the microphone to capture a
-              new recording.
-            </StepDescription>
-            <StatusPill ready={!!audioData}>
-              {audioData ? "Audio ready" : "Awaiting audio input"}
-            </StatusPill>
-            <AudioInput
-              onAudioSubmit={handleAudioLoad}
-              isLoading={isTranscribing}
-            />
-          </StepCard>
-
-          <StepCard>
-            <StepMeta>Step 2</StepMeta>
-            <StepTitle>Select source language</StepTitle>
-            <StepDescription>
-              Choose the language spoken in the audio for accurate
-              transcription.
-            </StepDescription>
-            <Autocomplete
-              autoHighlight
-              disableClearable
-              filterOptions={filterLanguageOptions}
-              getOptionLabel={(option) => option.label}
-              isOptionEqualToValue={(option, value) =>
-                option.value === value.value
-              }
-              noOptionsText="No supported language found."
-              onChange={onLanguageChange}
-              openOnFocus
-              options={ASR_LANGUAGE_OPTIONS}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  helperText="Search by language name or ISO code."
-                  label="Search language"
-                  placeholder="e.g. Luganda or lug"
-                />
-              )}
-              renderOption={(props, option) => {
-                const optionProps = { ...props };
-                delete optionProps.key;
-
-                return (
-                  <li
-                    key={option.value}
-                    {...optionProps}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "1rem",
-                    }}
-                  >
-                    <span>{option.label}</span>
-                    <span
-                      style={{
-                        color: "var(--color-muted)",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {option.value}
-                    </span>
-                  </li>
-                );
-              }}
-              slotProps={{
-                paper: {
-                  sx: {
-                    color: "var(--color-text)",
-                    backgroundColor: "var(--color-surface)",
-                    border: "1px solid var(--color-border)",
-                    boxShadow: "var(--color-elev-shadow)",
-                  },
-                },
-              }}
-              sx={{
-                my: 1,
-                "& .MuiFormHelperText-root": {
-                  color: "var(--color-muted)",
-                  mx: 0,
-                },
-                "& .MuiInputLabel-root": {
-                  color: "var(--color-muted)",
-                },
-                "& .MuiInputLabel-root.Mui-focused": {
-                  color: "var(--color-accent)",
-                },
-                "& .MuiOutlinedInput-root": {
-                  color: "var(--color-text)",
-                  backgroundColor: "var(--color-surface)",
-                  borderRadius: "0.75rem",
-                  "& fieldset": {
+      {/* PHASE 2: Full Workspace Studio (When transcribing or transcript is available) */}
+      {hasResultOrInProgress && (
+        <div ref={studioRef} className="w-full max-w-3xl mx-auto flex flex-col gap-6 animate-fadeIn scroll-mt-6">
+          {/* Top Control Bar: Audio Info, Player & "New Audio" Button */}
+          <div
+            className="rounded-3xl p-5 sm:p-6 border flex flex-col gap-4"
+            style={{
+              background: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+              boxShadow: "var(--color-elev-soft)",
+            }}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border"
+                  style={{
+                    background: "var(--color-pill)",
                     borderColor: "var(--color-border)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "var(--color-accent)",
-                  },
-                  "&.Mui-focused": {
-                    backgroundColor: "var(--color-accent-soft)",
-                    boxShadow: "0 0 0 3px var(--color-focus-ring)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "var(--color-accent)",
-                  },
-                },
-                "& .MuiSvgIcon-root": {
-                  color: "var(--color-text)",
-                },
-              }}
-              value={
-                ASR_LANGUAGE_OPTIONS.find(
-                  (option) => option.value === language
-                ) || ASR_LANGUAGE_OPTIONS[0]
-              }
-            />
-          </StepCard>
+                    color: "var(--color-accent)",
+                  }}
+                >
+                  <FileAudio size={20} />
+                </div>
+                <div className="truncate">
+                  <h3 className="text-sm sm:text-base font-bold m-0 truncate" style={{ color: "var(--color-text)" }}>
+                    {audioFileName || "Audio Track"}
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-muted)" }}>
+                    <span className="font-semibold" style={{ color: "var(--color-accent)" }}>
+                      {selectedLangObj.label} ({selectedLangObj.value.toUpperCase()})
+                    </span>
+                    <span>·</span>
+                    <span>{timestamps ? `${timestamps.length} timed segments` : "Full transcript"}</span>
+                  </div>
+                </div>
+              </div>
 
-          <StepCard>
-            <StepMeta>Step 3</StepMeta>
-            <StepTitle>Transcribe audio</StepTitle>
-            <StepDescription>
-              Start transcription when your audio and language are confirmed.
-            </StepDescription>
-            <ButtonContainer>
-              <GlassButton
-                onClick={handleAudioSubmit}
-                disabled={!audioData || isTranscribing}
-              >
-                {isTranscribing
-                  ? "Transcribing..."
-                  : textOutput
-                  ? "Transcribe Again"
-                  : "Transcribe Audio"}
-              </GlassButton>
-              <GhostButton
-                onClick={resetFlow}
-                disabled={isTranscribing || isSubmittingFeedback}
-              >
-                Reset
-              </GhostButton>
-            </ButtonContainer>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={handleTranscribe}
+                  disabled={isTranscribing}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all hover:opacity-80"
+                  style={{
+                    borderColor: "var(--color-border)",
+                    background: "var(--color-pill)",
+                    color: "var(--color-text)",
+                  }}
+                  title="Re-run transcription"
+                >
+                  <RotateCcw size={13} className={isTranscribing ? "animate-spin" : ""} />
+                  <span>Re-transcribe</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetAll}
+                  disabled={isTranscribing}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all hover:opacity-90"
+                  style={{
+                    background: "var(--color-accent)",
+                    color: "#ffffff",
+                  }}
+                  title="Upload another audio file"
+                >
+                  <PlusCircle size={14} />
+                  <span>New Audio</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Audio Waveform Player with live sync */}
+            {audioSrc && (
+              <div className="pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <AudioPlayer
+                  audioSrc={audioSrc}
+                  fileName={audioFileName}
+                  onTimeUpdate={setCurrentAudioTime}
+                  seekTime={seekTargetTime}
+                />
+              </div>
+            )}
+
+            {/* Progress Stage if actively transcribing */}
             {isTranscribing && (
               <div
-                role="status"
-                aria-live="polite"
-                className="w-full rounded-xl p-4 flex flex-col gap-2"
+                className="p-4 rounded-2xl border flex flex-col gap-2 mt-2"
                 style={{
-                  border: "1px solid var(--color-border)",
                   background: "var(--color-pill)",
+                  borderColor: "var(--color-border)",
                 }}
               >
-                <p className="m-0 text-sm font-semibold">{currentProgressStage.title}</p>
-                <p
-                  className="m-0 text-xs md:text-sm"
-                  style={{ color: "var(--color-muted)" }}
-                >
-                  {currentProgressStage.message}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold">{currentStage.title}</span>
+                  <span className="font-mono">{loadingSeconds}s elapsed</span>
+                </div>
+                <p className="text-xs m-0" style={{ color: "var(--color-muted)" }}>
+                  {currentStage.message}
                 </p>
                 <LinearProgress
                   variant="determinate"
-                  value={currentProgressStage.progress}
-                  color="inherit"
+                  value={currentStage.progress}
                   sx={{
                     borderRadius: "999px",
+                    height: 5,
                     backgroundColor: "var(--color-surface)",
                     "& .MuiLinearProgress-bar": {
                       backgroundColor: "var(--color-accent)",
                     },
                   }}
                 />
-                <p
-                  className="m-0 text-xs md:text-sm"
-                  style={{ color: "var(--color-muted)" }}
-                >
-                  Elapsed time: {loadingSeconds}s
-                </p>
               </div>
             )}
-          </StepCard>
-        </WorkflowPanel>
+          </div>
 
-        <ResultPanel>
-          <StepCard>
-            <StepMeta>Step 4</StepMeta>
-            <StepTitle>Review transcription</StepTitle>
-            <StepDescription>
-              The recognized text appears here. Use copy and feedback tools
-              after generation.
-            </StepDescription>
-            <StatusBanner
-              type="error"
-              message={errorMessage}
-              onDismiss={() => setErrorMessage("")}
-            />
-            <StatusBanner
-              type="success"
-              message={successMessage}
-              onDismiss={() => setSuccessMessage("")}
-            />
+          {/* Transcript Box - Takes Center Stage */}
+          <div ref={transcriptSectionRef} className="w-full scroll-mt-6">
             <TranscriptionTextArea
-              placeholder="Your recognized text will appear here."
               text={textOutput}
               setText={setTextOutput}
+              timestamps={timestamps}
+              setTimestamps={setTimestamps}
               isLoading={isTranscribing}
+              fileName={audioFileName}
+              language={language}
+              currentAudioTime={currentAudioTime}
+              onSeekAudio={(time) => setSeekTargetTime(time)}
+              placeholder="Transcribing audio with timestamps..."
             />
-            {audioData && (
-              <Footer
-                audioSrc={audioSrc}
-                text={textOutput}
-                copyToClipboard={copyToClipboard}
-                copySuccess={copySuccess}
-              />
-            )}
-            {textOutput && (
-              <>
-                <TranscriptToolbar>
-                  <StatusPill ready={!!textOutput}>Transcript ready</StatusPill>
-                  <GhostButton
-                    onClick={() => setShowFeedback((prev) => !prev)}
-                    disabled={isSubmittingFeedback}
-                  >
-                    {showFeedback ? "Hide Feedback" : "Share Feedback"}
-                  </GhostButton>
-                </TranscriptToolbar>
-                {showFeedback && (
-                  <FeedbackContainer>
-                    <StepTitle>Rate transcription accuracy</StepTitle>
-                    <SectionSubtext>
-                      Your feedback helps improve recognition quality.
-                    </SectionSubtext>
-                    <RatingStars>
+          </div>
+
+          {/* Feedback Card */}
+          {textOutput && (
+            <div
+              className="rounded-2xl p-4 border transition-all"
+              style={{
+                background: "var(--color-surface)",
+                borderColor: "var(--color-border)",
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Star size={16} style={{ color: "var(--color-accent)" }} />
+                  <span className="text-xs font-semibold" style={{ color: "var(--color-text)" }}>
+                    How was this transcription accuracy?
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowFeedback((p) => !p)}
+                  className="text-xs font-medium underline"
+                  style={{ color: "var(--color-accent)" }}
+                >
+                  {showFeedback ? "Hide" : "Rate & Comment"}
+                </button>
+              </div>
+
+              {showFeedback && (
+                <div className="mt-3 flex flex-col gap-3 pt-3 border-t" style={{ borderColor: "var(--color-border)" }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs" style={{ color: "var(--color-muted)" }}>
+                      Rating:
+                    </span>
+                    <div className="flex gap-1">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <span
+                        <button
                           key={star}
+                          type="button"
                           onClick={() => setRating(star)}
+                          className="p-1 text-base transition-transform hover:scale-110"
                           style={{
-                            color:
-                              star <= rating
-                                ? "var(--color-accent)"
-                                : "var(--color-muted)",
+                            color: star <= rating ? "var(--color-accent)" : "var(--color-muted)",
                           }}
                         >
                           ★
-                        </span>
+                        </button>
                       ))}
-                    </RatingStars>
-                    <FeedbackTextarea
-                      placeholder="Add optional comments"
-                      value={feedback}
-                      onChange={(e) => setFeedback(e.target.value)}
-                    />
-                    <GlassButton
-                      onClick={handleFeedbackSubmit}
-                      disabled={isSubmittingFeedback}
-                    >
-                      {isSubmittingFeedback
-                        ? "Submitting..."
-                        : "Submit Feedback"}
-                    </GlassButton>
-                  </FeedbackContainer>
-                )}
-              </>
-            )}
-          </StepCard>
-        </ResultPanel>
-      </DynamicMainContainer>
-    </>
+                    </div>
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Optional notes to improve our language models..."
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    className="p-2.5 rounded-xl text-xs border outline-none"
+                    style={{
+                      background: "var(--color-pill)",
+                      borderColor: "var(--color-border)",
+                      color: "var(--color-text)",
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleFeedbackSubmit}
+                    disabled={isSubmittingFeedback || !rating}
+                    className="self-end px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white transition-opacity"
+                    style={{ background: "var(--color-accent)" }}
+                  >
+                    {isSubmittingFeedback ? "Sending..." : "Submit Feedback"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
-};
+}
 
 export default SpeechToText;

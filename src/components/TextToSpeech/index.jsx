@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
-import LinearProgress from "@mui/material/LinearProgress";
+import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
+import LinearProgress from "@mui/material/LinearProgress";
 import { generateSpeech, getSpeechVoices } from "../../API";
 import { getUserFacingErrorMessage } from "../../lib/error-utils";
 import {
@@ -9,473 +9,515 @@ import {
   getTtsLanguage,
   TTS_LANGUAGE_OPTIONS,
 } from "../../lib/tts-languages";
-import {
-  ButtonContainer,
-  DynamicMainContainer,
-  GlassButton,
-  GhostButton,
-  ProgressStep,
-  ProgressTrack,
-  ResponsiveContainer,
-  ResultPanel,
-  SectionHeading,
-  SectionSubtext,
-  StatusPill,
-  StepCard,
-  StepDescription,
-  StepMeta,
-  StepTitle,
-  WorkflowPanel,
-} from "../SpeechToText/SpeechToText.styles";
-import {
-  AudioPreview,
-  CharacterCounter,
-  FieldGroup,
-  FieldHint,
-  FieldLabel,
-  LoadingMeta,
-  LoadingNotice,
-  LoadingTitle,
-  PlaceholderCard,
-  SpeakerSelect,
-  TtsTextArea,
-} from "./TextToSpeech.styles";
+import { samplePhraseDict } from "../../constants";
+import AudioPlayer from "../AudioPlayer/AudioPlayer";
 import StatusBanner from "../StatusBanner";
+import {
+  Volume2,
+  Sparkles,
+  Download,
+  RotateCcw,
+  CheckCircle2,
+  Sliders,
+  Type,
+} from "lucide-react";
 
 const MAX_TEXT_LENGTH = 600;
-const filterLanguageOptions = createFilterOptions({
-  stringify: (option) => `${option.label} ${option.value}`,
-});
-const SYNTHESIS_PROGRESS_STAGES = [
+const PREFERRED_TTS_LANG_KEY = "preferred_tts_language";
+
+const TTS_PROGRESS_STAGES = [
   {
     minSeconds: 0,
     progress: 30,
-    title: "Stage 1 of 3: Sending text",
-    message: "Submitting your text, language, and voice to the service.",
+    title: "Synthesizing text request",
+    message: "Analyzing phonetic structure and intonation contours.",
   },
   {
-    minSeconds: 8,
+    minSeconds: 7,
     progress: 65,
-    title: "Stage 2 of 3: Synthesizing voice",
-    message: "The model is generating speech audio.",
+    title: "Generating natural voice audio",
+    message: "Rendering multi-speaker neural audio waveform.",
   },
   {
-    minSeconds: 20,
+    minSeconds: 18,
     progress: 92,
-    title: "Stage 3 of 3: Finalizing audio",
-    message: "Still working. Cold starts can make this step take longer.",
+    title: "Finalizing audio stream",
+    message: "Encoding output audio for streaming and download.",
   },
 ];
 
-const getActiveProgressStage = (elapsedSeconds, stages) =>
-  stages.reduce((activeStage, stage) => {
-    if (elapsedSeconds >= stage.minSeconds) {
-      return stage;
-    }
-    return activeStage;
-  }, stages[0]);
+const getTtsProgressStage = (elapsed) =>
+  TTS_PROGRESS_STAGES.reduce((act, st) => {
+    if (elapsed >= st.minSeconds) return st;
+    return act;
+  }, TTS_PROGRESS_STAGES[0]);
 
-const formatVoiceLabel = (voice, index) => {
-  const source = voice.split("_")[0]?.toUpperCase() || "TTS";
-  return `${source} voice ${index + 1} (${voice})`;
+const getLanguageSamplePhrases = (langCode) => {
+  const entry = samplePhraseDict[langCode];
+  if (!entry || !entry[0] || !Array.isArray(entry[0][1])) return [];
+  return entry[0][1];
 };
 
 const TextToSpeech = () => {
   const [textInput, setTextInput] = useState("");
-  const [language, setLanguage] = useState(DEFAULT_TTS_LANGUAGE);
+  const [isExampleSelected, setIsExampleSelected] = useState(false);
+  const [selectedExampleIndex, setSelectedExampleIndex] = useState(null);
+  const [hasUserTyped, setHasUserTyped] = useState(false);
+  const [language, setLanguage] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(PREFERRED_TTS_LANG_KEY) || DEFAULT_TTS_LANGUAGE;
+    }
+    return DEFAULT_TTS_LANGUAGE;
+  });
   const [voice, setVoice] = useState("");
   const [voiceCatalog, setVoiceCatalog] = useState({});
   const [isLoadingVoices, setIsLoadingVoices] = useState(true);
-  const [voiceCatalogMessage, setVoiceCatalogMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [audioUrl, setAudioUrl] = useState("");
-  const [speechResult, setSpeechResult] = useState(null);
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
+  // Load available voice catalog
   useEffect(() => {
     let isActive = true;
-
-    const loadVoices = async () => {
+    const fetchVoices = async () => {
       try {
         const response = await getSpeechVoices();
-        if (!isActive) return;
-        setVoiceCatalog(response.by_language || {});
-      } catch (error) {
-        console.error("Unable to load TTS voices:", error);
-        if (!isActive) return;
-        setVoiceCatalogMessage(
-          "Voice choices could not be loaded. The service will select a voice automatically.",
-        );
-      } finally {
         if (isActive) {
-          setIsLoadingVoices(false);
+          setVoiceCatalog(response.by_language || {});
         }
+      } catch (err) {
+        console.error("Voices fetch error:", err);
+      } finally {
+        if (isActive) setIsLoadingVoices(false);
       }
     };
-
-    loadVoices();
-
+    fetchVoices();
     return () => {
       isActive = false;
     };
   }, []);
 
+  // Timer
   useEffect(() => {
-    if (!isLoading) {
+    if (!isGenerating) {
       setLoadingSeconds(0);
-      return undefined;
+      return;
     }
-
-    const intervalId = window.setInterval(() => {
-      setLoadingSeconds((previousSeconds) => previousSeconds + 1);
+    const timer = setInterval(() => {
+      setLoadingSeconds((s) => s + 1);
     }, 1000);
+    return () => clearInterval(timer);
+  }, [isGenerating]);
 
-    return () => window.clearInterval(intervalId);
-  }, [isLoading]);
-
-  const safeText = textInput.trim();
-  const selectedLanguage = getTtsLanguage(language) || TTS_LANGUAGE_OPTIONS[0];
+  const selectedLangObj = getTtsLanguage(language) || TTS_LANGUAGE_OPTIONS[0];
   const availableVoices = voiceCatalog[language] || [];
+  const charsLeft = MAX_TEXT_LENGTH - textInput.length;
+  const isNearLimit = charsLeft < 60;
 
-  const handleLanguageChange = (_event, selectedOption) => {
-    if (!selectedOption) return;
-    setLanguage(selectedOption.value);
-    setVoice("");
-    setAudioUrl("");
-    setSpeechResult(null);
-    setMessage("");
+  // Sample phrases for the current language (defaults to [] if none configured for this language)
+  const samplePhrases = getLanguageSamplePhrases(language);
+
+  const handleLanguageChange = (_e, option) => {
+    if (option) {
+      const nextLang = option.value;
+      setLanguage(nextLang);
+      setVoice("");
+      setAudioUrl("");
+      localStorage.setItem(PREFERRED_TTS_LANG_KEY, nextLang);
+
+      // If user had loaded an example and hasn't manually typed custom text,
+      // update textInput to the matching example phrase of the new language
+      if (isExampleSelected && !hasUserTyped) {
+        const nextPhrases = getLanguageSamplePhrases(nextLang);
+        if (nextPhrases.length > 0) {
+          const nextIndex =
+            selectedExampleIndex !== null && selectedExampleIndex < nextPhrases.length
+              ? selectedExampleIndex
+              : 0;
+          setTextInput(nextPhrases[nextIndex]);
+          setSelectedExampleIndex(nextIndex);
+        } else {
+          // If the new language doesn't have examples, clear the example text
+          setTextInput("");
+          setIsExampleSelected(false);
+          setSelectedExampleIndex(null);
+        }
+      }
+    }
+  };
+
+  const handleTextChange = (e) => {
+    const val = e.target.value;
+    setTextInput(val);
+    if (val.trim().length > 0) {
+      setHasUserTyped(true);
+      setIsExampleSelected(false);
+      setSelectedExampleIndex(null);
+    } else {
+      setHasUserTyped(false);
+      setIsExampleSelected(false);
+      setSelectedExampleIndex(null);
+    }
+  };
+
+  const handleSelectExample = (phrase, idx) => {
+    setTextInput(phrase);
+    setIsExampleSelected(true);
+    setSelectedExampleIndex(idx);
+    setHasUserTyped(false);
+  };
+
+  const handleClearExample = () => {
+    setTextInput("");
+    setIsExampleSelected(false);
+    setSelectedExampleIndex(null);
+    setHasUserTyped(false);
   };
 
   const handleGenerate = async () => {
-    if (!safeText) {
-      setErrorMessage("Please enter text before generating speech.");
-      setMessage("");
+    const trimmed = textInput.trim();
+    if (!trimmed) {
+      setErrorMessage("Please enter or select some text before generating speech.");
       return;
     }
 
-    setIsLoading(true);
+    setIsGenerating(true);
     setErrorMessage("");
-    setMessage("");
+    setSuccessMessage("");
     setLoadingSeconds(0);
 
     try {
-      const response = await generateSpeech(safeText, { language, voice });
+      const response = await generateSpeech(trimmed, { language, voice });
       setAudioUrl(response.audio_url);
-      setSpeechResult(response);
-      setMessage("Speech generated successfully.");
-    } catch (error) {
-      console.error(error);
+      setSuccessMessage("Speech generated successfully!");
+    } catch (err) {
+      console.error("TTS generation error:", err);
       setErrorMessage(
         getUserFacingErrorMessage(
-          error,
-          "Unable to generate speech right now. Please try again.",
-        ),
+          err,
+          "Unable to synthesize voice audio right now. Please try again."
+        )
       );
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false);
     }
-  };
-
-  const handleDownload = () => {
-    if (!audioUrl) return;
-
-    const downloadLink = document.createElement("a");
-    downloadLink.href = audioUrl;
-    downloadLink.download = `sunbird_tts_${Date.now()}.wav`;
-    downloadLink.rel = "noopener";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    downloadLink.remove();
   };
 
   const handleReset = () => {
     setTextInput("");
-    setLanguage(DEFAULT_TTS_LANGUAGE);
-    setVoice("");
-    setMessage("");
-    setErrorMessage("");
+    setIsExampleSelected(false);
+    setSelectedExampleIndex(null);
+    setHasUserTyped(false);
     setAudioUrl("");
-    setSpeechResult(null);
+    setErrorMessage("");
+    setSuccessMessage("");
   };
 
-  const activeStep = audioUrl ? 3 : safeText ? 2 : 1;
-  const currentProgressStage = getActiveProgressStage(
-    loadingSeconds,
-    SYNTHESIS_PROGRESS_STAGES,
-  );
-  const resultLanguage = speechResult?.language
-    ? getTtsLanguage(speechResult.language)?.label || speechResult.language
-    : selectedLanguage.label;
-  const resultDuration = Number(speechResult?.duration_seconds);
+  const handleDownloadAudio = () => {
+    if (!audioUrl) return;
+    const a = document.createElement("a");
+    a.href = audioUrl;
+    a.download = `sunbird_tts_${language}_${Date.now()}.mp3`;
+    a.target = "_blank";
+    a.click();
+  };
+
+  const currentStage = getTtsProgressStage(loadingSeconds);
 
   return (
-    <>
-      <ResponsiveContainer>
-        <SectionHeading>Speech Synthesis Workflow</SectionHeading>
-        <SectionSubtext>
-          Write text, search for a language, choose a voice, and generate
-          production-ready audio.
-        </SectionSubtext>
-        <ProgressTrack aria-label="Text-to-speech progress">
-          <ProgressStep active={activeStep >= 1}>1. Write text</ProgressStep>
-          <ProgressStep active={activeStep >= 2}>
-            2. Select language and voice
-          </ProgressStep>
-          <ProgressStep active={activeStep >= 3}>
-            3. Generate audio
-          </ProgressStep>
-        </ProgressTrack>
-      </ResponsiveContainer>
+    <div className="w-full flex flex-col gap-6">
+      <StatusBanner
+        type="error"
+        message={errorMessage}
+        onDismiss={() => setErrorMessage("")}
+      />
+      <StatusBanner
+        type="success"
+        message={successMessage}
+        onDismiss={() => setSuccessMessage("")}
+      />
 
-      <DynamicMainContainer hasFooter={false}>
-        <WorkflowPanel>
-          <StepCard>
-            <StepMeta>Step 1</StepMeta>
-            <StepTitle>Enter text to synthesize</StepTitle>
-            <StepDescription>
-              Add the sentence or paragraph you want converted to speech.
-            </StepDescription>
-            <FieldGroup>
-              <FieldLabel htmlFor="tts-text-input">Text</FieldLabel>
-              <TtsTextArea
-                id="tts-text-input"
-                placeholder="Type text to convert into speech"
-                value={textInput}
-                maxLength={MAX_TEXT_LENGTH}
-                onChange={(event) => setTextInput(event.target.value)}
-              />
-              <CharacterCounter>
-                {textInput.length}/{MAX_TEXT_LENGTH}
-              </CharacterCounter>
-            </FieldGroup>
-          </StepCard>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Text Input & Sample phrases */}
+        <div className="lg:col-span-7 flex flex-col gap-5">
+          <div
+            className="rounded-2xl p-5 border flex flex-col gap-3"
+            style={{
+              background: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+              boxShadow: "var(--color-elev-soft)",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
+                Step 1 · Text Input
+              </span>
 
-          <StepCard>
-            <StepMeta>Step 2</StepMeta>
-            <StepTitle>Select language and voice</StepTitle>
-            <StepDescription>
-              Search the multilingual catalog, then optionally choose a specific
-              speaker voice.
-            </StepDescription>
-            <Autocomplete
-              autoHighlight
-              disableClearable
-              filterOptions={filterLanguageOptions}
-              getOptionLabel={(option) => option.label}
-              isOptionEqualToValue={(option, value) =>
-                option.value === value.value
+              {/* Live Character Counter */}
+              <span
+                className={`text-xs font-mono font-medium ${
+                  isNearLimit ? "text-amber-500 font-bold" : ""
+                }`}
+                style={{ color: isNearLimit ? "var(--color-accent)" : "var(--color-muted)" }}
+              >
+                {textInput.length} / {MAX_TEXT_LENGTH} chars
+              </span>
+            </div>
+
+            <textarea
+              rows={6}
+              maxLength={MAX_TEXT_LENGTH}
+              value={textInput}
+              onChange={handleTextChange}
+              placeholder={
+                samplePhrases.length > 0
+                  ? `Type or paste text in ${selectedLangObj.label}, or pick an example below...`
+                  : `Type or paste ${selectedLangObj.label} text to synthesize into voice...`
               }
-              noOptionsText="No supported language found."
-              onChange={handleLanguageChange}
-              openOnFocus
-              options={TTS_LANGUAGE_OPTIONS}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  helperText={`Search ${TTS_LANGUAGE_OPTIONS.length} supported languages by name or ISO code.`}
-                  label="Search language"
-                  placeholder="e.g. Yoruba or yor"
-                />
-              )}
-              renderOption={(props, option) => {
-                const optionProps = { ...props };
-                delete optionProps.key;
-
-                return (
-                  <li
-                    key={option.value}
-                    {...optionProps}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "1rem",
-                    }}
-                  >
-                    <span>{option.label}</span>
-                    <span
-                      style={{
-                        color: "var(--color-muted)",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {option.value}
-                    </span>
-                  </li>
-                );
+              className="w-full p-4 rounded-xl border text-sm leading-relaxed outline-none transition-all resize-none focus:ring-2 focus:ring-amber-500/20"
+              style={{
+                background: "var(--color-pill)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text)",
               }}
-              slotProps={{
-                paper: {
-                  sx: {
-                    color: "var(--color-text)",
-                    backgroundColor: "var(--color-surface)",
-                    border: "1px solid var(--color-border)",
-                    boxShadow: "var(--color-elev-shadow)",
-                  },
-                },
-              }}
-              sx={{
-                my: 1,
-                "& .MuiFormHelperText-root": {
-                  color: "var(--color-muted)",
-                  mx: 0,
-                },
-                "& .MuiInputLabel-root": {
-                  color: "var(--color-muted)",
-                },
-                "& .MuiInputLabel-root.Mui-focused": {
-                  color: "var(--color-accent)",
-                },
-                "& .MuiOutlinedInput-root": {
-                  color: "var(--color-text)",
-                  backgroundColor: "var(--color-surface)",
-                  borderRadius: "0.75rem",
-                  "& fieldset": {
-                    borderColor: "var(--color-border)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "var(--color-accent)",
-                  },
-                  "&.Mui-focused": {
-                    backgroundColor: "var(--color-accent-soft)",
-                    boxShadow: "0 0 0 3px var(--color-focus-ring)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "var(--color-accent)",
-                  },
-                },
-                "& .MuiSvgIcon-root": {
-                  color: "var(--color-text)",
-                },
-              }}
-              value={selectedLanguage}
             />
 
-            <FieldGroup>
-              <FieldLabel htmlFor="tts-voice">Voice</FieldLabel>
-              <SpeakerSelect
-                id="tts-voice"
-                value={voice}
-                disabled={isLoadingVoices}
-                onChange={(event) => setVoice(event.target.value)}
-              >
-                <option value="">
-                  {isLoadingVoices
-                    ? "Loading voices..."
-                    : "Automatic voice (recommended)"}
-                </option>
-                {availableVoices.map((voiceOption, index) => (
-                  <option key={voiceOption} value={voiceOption}>
-                    {formatVoiceLabel(voiceOption, index)}
-                  </option>
-                ))}
-              </SpeakerSelect>
-              <FieldHint>
-                {voiceCatalogMessage ||
-                  (availableVoices.length
-                    ? `${availableVoices.length} speaker ${
-                        availableVoices.length === 1 ? "voice" : "voices"
-                      } available for ${selectedLanguage.label}.`
-                    : "Sunbird will select the best available voice for this language.")}
-              </FieldHint>
-            </FieldGroup>
-
-            <StatusPill ready={Boolean(safeText)}>
-              {safeText
-                ? `${selectedLanguage.label} text ready for synthesis`
-                : "Enter text to continue"}
-            </StatusPill>
-            <ButtonContainer>
-              <GlassButton
-                type="button"
-                disabled={isLoading || !safeText}
-                onClick={handleGenerate}
-              >
-                {isLoading ? "Generating..." : "Generate Speech"}
-              </GlassButton>
-              <GhostButton
-                type="button"
-                disabled={isLoading}
-                onClick={handleReset}
-              >
-                Reset
-              </GhostButton>
-            </ButtonContainer>
-          </StepCard>
-        </WorkflowPanel>
-
-        <ResultPanel>
-          <StepCard>
-            <StepMeta>Step 3</StepMeta>
-            <StepTitle>Preview and export</StepTitle>
-            <StepDescription>
-              Review generated audio, then download the WAV file.
-            </StepDescription>
-
-            {audioUrl ? (
-              <>
-                <AudioPreview controls src={audioUrl}>
-                  Your browser does not support the audio element.
-                </AudioPreview>
-                <FieldHint>
-                  {resultLanguage}
-                  {speechResult?.voice ? ` · ${speechResult.voice}` : ""}
-                  {Number.isFinite(resultDuration)
-                    ? ` · ${resultDuration.toFixed(1)}s`
-                    : ""}
-                </FieldHint>
-              </>
-            ) : (
-              <PlaceholderCard>
-                Generated speech will appear here after synthesis.
-              </PlaceholderCard>
+            {/* Quick Sample Phrase Chips - only visible when user has not typed custom text and examples exist */}
+            {!hasUserTyped && samplePhrases.length > 0 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold" style={{ color: "var(--color-muted)" }}>
+                    Try an example phrase:
+                  </span>
+                  {isExampleSelected && (
+                    <button
+                      type="button"
+                      onClick={handleClearExample}
+                      className="text-xs hover:underline cursor-pointer"
+                      style={{ color: "var(--color-muted)" }}
+                    >
+                      Clear example
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {samplePhrases.slice(0, 3).map((phrase, idx) => {
+                    const isSelected = isExampleSelected && selectedExampleIndex === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectExample(phrase, idx)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs text-left border transition-all hover:opacity-80 truncate max-w-full ${
+                          isSelected ? "ring-2 ring-amber-500/40 font-medium" : ""
+                        }`}
+                        style={{
+                          background: isSelected ? "var(--color-accent-soft)" : "var(--color-surface)",
+                          borderColor: isSelected ? "var(--color-accent)" : "var(--color-border)",
+                          color: isSelected ? "var(--color-accent)" : "var(--color-text)",
+                        }}
+                        title={phrase}
+                      >
+                        "{phrase.length > 55 ? `${phrase.slice(0, 55)}...` : phrase}"
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
+          </div>
+        </div>
 
-            {isLoading && (
-              <LoadingNotice role="status" aria-live="polite">
-                <LoadingTitle>{currentProgressStage.title}</LoadingTitle>
-                <LoadingMeta>{currentProgressStage.message}</LoadingMeta>
-                <LoadingMeta>Elapsed time: {loadingSeconds}s</LoadingMeta>
+        {/* Right Column: Voice & Generation Actions */}
+        <div className="lg:col-span-5 flex flex-col gap-5">
+          {/* Language & Voice Selector Card */}
+          <div
+            className="rounded-2xl p-5 border flex flex-col gap-4"
+            style={{
+              background: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+              boxShadow: "var(--color-elev-soft)",
+            }}
+          >
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
+              Step 2 · Language & Voice
+            </span>
+
+            {/* Language Selector */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
+                Language
+              </label>
+              <Autocomplete
+                disableClearable
+                options={TTS_LANGUAGE_OPTIONS}
+                getOptionLabel={(opt) => `${opt.label} (${opt.value})`}
+                value={selectedLangObj}
+                onChange={handleLanguageChange}
+                renderInput={(params) => (
+                  <TextField {...params} size="small" placeholder="Select TTS language..." />
+                )}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "var(--color-text)",
+                    backgroundColor: "var(--color-pill)",
+                    borderRadius: "0.75rem",
+                    fontSize: "0.875rem",
+                    "& fieldset": { borderColor: "var(--color-border)" },
+                  },
+                }}
+              />
+            </div>
+
+            {/* Speaker Voice Selector */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
+                Speaker Voice
+              </label>
+              {availableVoices.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {availableVoices.map((v, i) => {
+                    const isSelected = voice === v || (!voice && i === 0);
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setVoice(v)}
+                        className={`p-2.5 rounded-xl border text-xs font-medium transition-all ${
+                          isSelected ? "shadow-sm" : "hover:opacity-80"
+                        }`}
+                        style={{
+                          background: isSelected ? "var(--color-accent-soft)" : "var(--color-pill)",
+                          borderColor: isSelected ? "var(--color-accent)" : "var(--color-border)",
+                          color: isSelected ? "var(--color-accent)" : "var(--color-text)",
+                        }}
+                      >
+                        Voice {i + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div
+                  className="p-3 rounded-xl text-xs border"
+                  style={{
+                    background: "var(--color-pill)",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-muted)",
+                  }}
+                >
+                  {isLoadingVoices ? "Loading voices..." : "Default natural neural voice"}
+                </div>
+              )}
+            </div>
+
+            {/* Generate Trigger */}
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isGenerating || !textInput.trim()}
+                className="flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.99] disabled:opacity-50"
+                style={{
+                  background: "var(--color-accent)",
+                  color: "#ffffff",
+                }}
+              >
+                {isGenerating ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Synthesizing... ({loadingSeconds}s)</span>
+                  </>
+                ) : (
+                  <>
+                    <Volume2 size={16} />
+                    <span>Generate Speech</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={isGenerating}
+                className="py-3 px-3.5 rounded-xl text-xs font-semibold border transition-colors hover:opacity-80"
+                style={{
+                  borderColor: "var(--color-border)",
+                  background: "var(--color-pill)",
+                  color: "var(--color-muted)",
+                }}
+              >
+                <RotateCcw size={14} />
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+            {isGenerating && (
+              <div
+                className="p-3.5 rounded-xl border flex flex-col gap-2 mt-1"
+                style={{
+                  background: "var(--color-pill)",
+                  borderColor: "var(--color-border)",
+                }}
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold">{currentStage.title}</span>
+                  <span className="font-mono">{loadingSeconds}s elapsed</span>
+                </div>
                 <LinearProgress
                   variant="determinate"
-                  value={currentProgressStage.progress}
-                  color="inherit"
+                  value={currentStage.progress}
                   sx={{
                     borderRadius: "999px",
+                    height: 5,
                     backgroundColor: "var(--color-surface)",
                     "& .MuiLinearProgress-bar": {
                       backgroundColor: "var(--color-accent)",
                     },
                   }}
                 />
-              </LoadingNotice>
+              </div>
             )}
+          </div>
 
-            <StatusBanner
-              type="error"
-              message={errorMessage}
-              onDismiss={() => setErrorMessage("")}
-            />
-            <StatusBanner
-              type="success"
-              message={message}
-              onDismiss={() => setMessage("")}
-            />
+          {/* Audio Output Player Card */}
+          {audioUrl && (
+            <div
+              className="rounded-2xl p-5 border flex flex-col gap-3"
+              style={{
+                background: "var(--color-surface)",
+                borderColor: "var(--color-border)",
+                boxShadow: "var(--color-elev-soft)",
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-accent)" }}>
+                  Generated Audio Result
+                </span>
 
-            <ButtonContainer>
-              <GhostButton
-                type="button"
-                disabled={!audioUrl}
-                onClick={handleDownload}
-              >
-                Download WAV
-              </GhostButton>
-            </ButtonContainer>
-          </StepCard>
-        </ResultPanel>
-      </DynamicMainContainer>
-    </>
+                <button
+                  type="button"
+                  onClick={handleDownloadAudio}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-all hover:opacity-80"
+                  style={{
+                    borderColor: "var(--color-border)",
+                    background: "var(--color-pill)",
+                    color: "var(--color-text)",
+                  }}
+                >
+                  <Download size={13} />
+                  <span>Download MP3</span>
+                </button>
+              </div>
+
+              <AudioPlayer audioSrc={audioUrl} fileName={`TTS_${language}_output.mp3`} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

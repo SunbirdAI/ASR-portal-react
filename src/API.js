@@ -129,6 +129,7 @@ export async function recognizeSpeech(audioData, languageCode) {
   const formData = new FormData();
   formData.append("audio", audioData);
   formData.append("language", languageCode);
+  formData.append("timestamps", "true");
 
   return requestJson(
     asrUrl,

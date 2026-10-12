@@ -1,191 +1,216 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { Search, FileAudio, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 
-const DataTable = ({ transcriptData }) => {
+const DataTable = ({ transcriptData = [] }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState("");
 
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(5);
-    const [paginatedData, setPaginatedData] = useState([]);
-    const [isFirstPage, setIsFirstPage] = useState(true)
-    const [isLastPage, setIsLastPage] = useState(true)
-    const [searchQuery, setSearchQuery] = useState('');
-
-    // Handle the search query change
-    const handleSearchChange = (e) => {
-        setSearchQuery(e.target.value);
-    };
-
-    // Filter the data based on the search query
-    const filteredData = transcriptData.filter(({ filename }) =>
-        filename.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredData = useMemo(() => {
+    return transcriptData.filter(({ filename = "" }) =>
+      filename.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    const options = { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric' };
+  }, [transcriptData, searchQuery]);
 
-    const transformedData = filteredData.map(({ id, username, email, filename, uploaded, audio_file_url, transcription }) => ({
-        id: id,
-        username,
-        filename,
-        uploaded: new Date(uploaded).toLocaleString('en-US', options),
-        audio_file_url: audio_file_url,
-        email,
-        transcription,
-    }));
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedRows = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
-    useEffect(() => {
-        const paginate = () => {
-            const indexOfLastItem = currentPage * itemsPerPage;
-            const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-            const viewedData = transformedData.slice(indexOfFirstItem, indexOfLastItem)
-            setPaginatedData(viewedData);
-            indexOfFirstItem === 0 ? setIsFirstPage(true) : setIsFirstPage(false)
-            indexOfLastItem >= transformedData.length ? setIsLastPage(true) : setIsLastPage(false)
-        };
-        paginate();
-    }, [currentPage, itemsPerPage, searchQuery]);
+  const formatDate = (isoString) => {
+    if (!isoString) return "—";
+    try {
+      return new Date(isoString).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return isoString;
+    }
+  };
 
-    const handleItemsPerPageChange = (event) => {
-        setItemsPerPage(Number(event.target.value));
-        setCurrentPage(1);
-    };
-
-    const handleNextPage = () => {
-        if (isLastPage) { }
-        else { setCurrentPage((prevPage) => prevPage + 1); }
-    };
-
-    const handlePrevPage = () => {
-        if (isFirstPage) { }
-        else { setCurrentPage((prevPage) => prevPage - 1); }
-    };
-
-    const toggleDropdown = (id) => {
-        document.getElementById(`dropdown-${id}`).classList.toggle('hidden');
-    };
-
-    return (<>
-        <div className="bg-white border border-[#E5E5E3] p-8 rounded-2xl w-full">
-            <div className=" flex items-center justify-between pb-6 flex-wrap">
-                <div className=" flex items-baseline">
-                    <p>Show   </p>
-                    <div className="px-3 py-3">
-                        <select className="px-2 border-2 border-black/30 rounded-lg focus:outline-sunbird-orange" onChange={handleItemsPerPageChange} value={itemsPerPage}>
-                            <option value={5}>
-                                5
-                            </option>
-                            <option value={10}>
-                                10
-                            </option>
-                            <option value={20}>
-                                20
-                            </option>
-                            <option value={transformedData.length}>
-                                all
-                            </option>
-                        </select></div>
-
-                    <p>  entries</p>
-                </div>
-                <div className="flex items-center justify-between">
-                    <div className="flex bg-white border border-[#E5E5E3] items-center p-2 rounded-xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-black/50" viewBox="0 0 20 20"
-                            fill="currentColor">
-                            <path
-                                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                            />
-                        </svg>
-                        <input className="bg-white outline-none ml-1 block placeholder:text-black/50" onChange={handleSearchChange} type="text" name="" id="" placeholder="search..." />
-                    </div>
-                </div>
-            </div>
-            <div>
-                <div className="-mx-4 sm:-mx-8 px-4 sm:px-8 py-4 overflow-x-auto">
-                    <div className="inline-block min-w-full shadow rounded-lg overflow-hidden">
-                        <table className="min-w-full leading-normal">
-                            <thead>
-                                <tr>
-                                    <th
-                                        className="px-5 py-3 border-b-2 border-[#E5E5E3] bg-[#EFEFED] text-left text-xs font-semibold text-black uppercase tracking-wider">
-                                        File Name
-                                    </th>
-                                    <th
-                                        className="px-5 py-3 border-b-2 border-[#E5E5E3] bg-[#EFEFED] text-left text-xs font-semibold text-black uppercase tracking-wider">
-                                        Uploaded
-                                    </th>
-
-                                    <th
-                                        className="px-5 py-3 border-b-2 border-[#E5E5E3] bg-[#EFEFED] text-left text-xs font-semibold text-black uppercase tracking-wider">
-                                        Actions
-                                    </th>
-
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedData.map(({ id, username, email, filename, uploaded, audio_file_url, transcription }, i) => <tr key={i} className="hover:bg-[#F7F7F6] transition-opacity bg-white">
-                                    <td className="px-5 py-5 border-b border-[#E5E5E3] text-sm">
-                                        <div className="flex items-center">
-                                            <div className="flex-shrink-0 w-10 h-10">
-                                                <img className="w-full h-full rounded-full"
-                                                    src="https://www.svgrepo.com/show/495027/audio-square.svg"
-                                                    alt="" />
-                                            </div>
-                                            <div className="ml-3">
-                                                <p className="text-black whitespace-no-wrap">
-                                                    {filename}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-5 border-b border-[#E5E5E3] text-sm">
-                                        <p className="text-black whitespace-no-wrap">{uploaded}</p>
-                                    </td>
-                                    <td className="px-5 py-5 border-b border-[#E5E5E3] text-sm relative">
-                                        <span
-                                            className="relative inline-block px-3 py-1 font-semibold text-black hover:bg-white bg-[#EFEFED] rounded-full leading-tight border border-[#E5E5E3]">
-                                            <span aria-hidden
-                                                className="absolute inset-0 bg-white opacity-40 rounded-full"></span>
-                                            <span onClick={() => toggleDropdown(i)} className="relative inline-block cursor-pointer">•••</span>
-                                        </span>
-                                        <div
-                                            id={`dropdown-${i}`}
-                                            className="hidden origin-top-right absolute right-0 mt-2 w-56 rounded-xl shadow-md bg-white border border-[#E5E5E3] z-10"
-                                        >
-                                            <div className="py-1">
-
-                                                <NavLink className="block px-4 py-2 text-sm text-black hover:bg-[#EFEFED]" to={`/files/edit/${id}`}>
-                                                    <i className="fas fa-eye mr-2"></i>  View Transcription
-                                                </NavLink>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>)
-
-                                }
-                            </tbody>
-                        </table>
-                        <div
-                            className="px-5 py-5 bg-white border-t flex flex-col xs:flex-row items-center xs:justify-between          ">
-                            <span className="text-xs xs:text-sm text-black">
-                                Showing {(currentPage * itemsPerPage) - itemsPerPage + 1} to {(currentPage * itemsPerPage) <= transformedData.length ? (currentPage * itemsPerPage) : transformedData.length} of {transformedData.length} Entries
-                            </span>
-                            <div className="inline-flex mt-2 xs:mt-0">
-                                <button
-                                    onClick={handlePrevPage}
-                                    className="text-sm text-black transition duration-150 hover:bg-white bg-[#EFEFED] border border-[#E5E5E3] font-semibold py-2 px-4 rounded-full">
-                                    Prev
-                                </button>
-                                &nbsp; &nbsp;
-                                <button
-                                    onClick={handleNextPage}
-                                    className="text-sm text-black transition duration-150 hover:bg-white bg-[#EFEFED] border border-[#E5E5E3] font-semibold py-2 px-4 rounded-full">
-                                    Next
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  return (
+    <div className="w-full flex flex-col gap-4">
+      {/* Top Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative flex-1 max-w-sm">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: "var(--color-muted)" }}
+          />
+          <input
+            type="text"
+            placeholder="Search files by name..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-9 pr-3 py-2 rounded-xl text-xs border outline-none transition-all"
+            style={{
+              background: "var(--color-pill)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-text)",
+            }}
+          />
         </div>
-    </>)
-}
 
-export default DataTable
+        {/* Rows per page selector */}
+        <div className="flex items-center gap-2 self-end sm:self-auto text-xs" style={{ color: "var(--color-muted)" }}>
+          <span>Show:</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="px-2.5 py-1.5 rounded-lg border text-xs outline-none"
+            style={{
+              background: "var(--color-pill)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-text)",
+            }}
+          >
+            <option value={5}>5 files</option>
+            <option value={10}>10 files</option>
+            <option value={25}>25 files</option>
+            <option value={50}>50 files</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Modern Table */}
+      <div
+        className="w-full overflow-x-auto rounded-xl border"
+        style={{ borderColor: "var(--color-border)" }}
+      >
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr
+              className="border-b text-[11px] font-semibold uppercase tracking-wider"
+              style={{
+                background: "var(--color-pill)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-muted)",
+              }}
+            >
+              <th className="px-4 py-3">File Name</th>
+              <th className="px-4 py-3 hidden sm:table-cell">Uploaded</th>
+              <th className="px-4 py-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y text-xs" style={{ borderColor: "var(--color-border)" }}>
+            {paginatedRows.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-4 py-12 text-center" style={{ color: "var(--color-muted)" }}>
+                  No files found matching your search.
+                </td>
+              </tr>
+            ) : (
+              paginatedRows.map((file) => (
+                <tr
+                  key={file.id}
+                  className="transition-colors hover:bg-[var(--color-pill)] group"
+                >
+                  {/* File Name */}
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                        style={{
+                          background: "var(--color-surface)",
+                          borderColor: "var(--color-border)",
+                          color: "var(--color-accent)",
+                        }}
+                      >
+                        <FileAudio size={16} />
+                      </div>
+                      <div className="flex flex-col truncate max-w-[240px] sm:max-w-md">
+                        <span className="font-semibold truncate" style={{ color: "var(--color-text)" }}>
+                          {file.filename || "Untitled Recording"}
+                        </span>
+                        {file.transcription && (
+                          <span className="text-[11px] truncate opacity-70" style={{ color: "var(--color-muted)" }}>
+                            {file.transcription.slice(0, 60)}...
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Upload Date */}
+                  <td className="px-4 py-3.5 hidden sm:table-cell" style={{ color: "var(--color-muted)" }}>
+                    {formatDate(file.uploaded)}
+                  </td>
+
+                  {/* Action Link */}
+                  <td className="px-4 py-3.5 text-right">
+                    <NavLink
+                      to={`/files/edit/${file.id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all hover:opacity-85 no-underline"
+                      style={{
+                        borderColor: "var(--color-border)",
+                        background: "var(--color-surface)",
+                        color: "var(--color-accent)",
+                      }}
+                    >
+                      <span>Open</span>
+                      <ExternalLink size={12} />
+                    </NavLink>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="flex items-center justify-between text-xs pt-2" style={{ color: "var(--color-muted)" }}>
+        <span>
+          Showing {filteredData.length > 0 ? startIndex + 1 : 0} to{" "}
+          {Math.min(startIndex + itemsPerPage, filteredData.length)} of {filteredData.length} entries
+        </span>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            disabled={currentPage <= 1}
+            className="p-1.5 rounded-lg border transition-opacity disabled:opacity-30"
+            style={{
+              borderColor: "var(--color-border)",
+              background: "var(--color-surface)",
+            }}
+            title="Previous page"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <span className="px-2 font-mono font-medium">
+            {currentPage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+            disabled={currentPage >= totalPages}
+            className="p-1.5 rounded-lg border transition-opacity disabled:opacity-30"
+            style={{
+              borderColor: "var(--color-border)",
+              background: "var(--color-surface)",
+            }}
+            title="Next page"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DataTable;

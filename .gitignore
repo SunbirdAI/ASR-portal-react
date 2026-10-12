@@ -26,3 +26,5 @@ yarn-error.log*
 # IDE
 .idea
 
+DESIGN_TOKENS.md
+.pnpm-store

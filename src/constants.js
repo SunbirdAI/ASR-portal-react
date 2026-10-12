@@ -69,5 +69,62 @@ export const samplePhraseDict = {
             "Erojo eyi lu nga aa mgbo sa'wa pi pi azia o'du alu alu vu si .",
             "Le 'ba dria ma esu driwala eyi ma egata eyi nzezu ori koko."
         ]]
+    ],
+    "swa": [
+        ["Swahili", [
+            "Habari za asubuhi? Tunafurahi kukuona leo.",
+            "Asante sana kwa kufanya kazi hii nzuri.",
+            "Wafanyakazi sasa wanaweza kuchagua kufanya kazi nyumbani au kuja ofisini.",
+            "Kila mtu anahitaji uhuru wa kueleza maoni yake kwa uwazi."
+        ]]
+    ],
+    "kin": [
+        ["Kinyarwanda", [
+            "Muraho? Twishimiye kubabona uyu munsi.",
+            "Urakoze cyane gukora uyu murimo mwiza.",
+            "Abakozi ubu bashobora guhitamo gukorera mu rugo cyangwa ku biro.",
+            "Buri wese akeneye umudendezo wo kugaragaza ibitekerezo bye."
+        ]]
+    ],
+    "hau": [
+        ["Hausa", [
+            "Ina kwana? Muna farin cikin ganin ku a yau.",
+            "Na gode sosai da wannan kyakkyawan aiki.",
+            "Ma'aikata yanzu suna iya zaɓar yin aiki daga gida ko zuwa ofis.",
+            "Kowane mutum yana bukatar 'yancin bayyana ra'ayinsa a sarari."
+        ]]
+    ],
+    "yor": [
+        ["Yoruba", [
+            "Bawo ni? Inú wa dùn láti rí ọ lónìí.",
+            "Ẹ ṣeun púpọ̀ fún iṣẹ́ ribiribi yìí.",
+            "Àwọn òṣìṣẹ́ ti lè yan láti ṣiṣẹ́ láti ilé tàbí wá sí ọ́fíìsì.",
+            "Gbogbo eniyan lo nilo ominira lati sọ ero wọn."
+        ]]
+    ],
+    "ibo": [
+        ["Igbo", [
+            "Kedu ka ị mere? Obi dị anyị ụtọ ịhụ gị taa.",
+            "Dalu nke ukwuu maka ịrụ ọrụ a dị mma.",
+            "Ndị ọrụ nwere ike ịhọrọ ịrụ ọrụ n'ụlọ ma ọ bụ bịa n'ọfịs.",
+            "Onye ọ bụla chọrọ nnwere onwe ikwupụta echiche ya n'atụghị egwu."
+        ]]
+    ],
+    "luo": [
+        ["Luo", [
+            "Oyawore? Wamor ahinya neni kawuono.",
+            "Erokamano maduong' kuom tich maber ma itimo.",
+            "Jotic koro nyalo yiero tiyo gi dala kata biro e ofis.",
+            "Ng'ato ka ng'ato dwaro thuolo mar wacho paro mare."
+        ]]
+    ],
+    "lin": [
+        ["Lingala", [
+            "Mbote? Tozali na esengo ya komona yo lelo.",
+            "Matondi mingi mpo na mosala oyo ya kitoko.",
+            "Basali bakoki sikoyo kopona kosala na ndako to koya na biro.",
+            "Moto nyonso azali na mposa ya bonsomi ya koloba makanisi na ye."
+        ]]
     ]
 }
+

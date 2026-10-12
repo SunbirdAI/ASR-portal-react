@@ -40,7 +40,7 @@ export const FooterContainer = styled.footer`
 `;
 
 export const ButtonContainer = styled.div`
-  ${tw`w-full md:w-auto flex justify-end`}
+  ${tw`w-full md:w-auto flex justify-end gap-2`}
 `;
 
 export const EditButtonContainer = styled.div`
