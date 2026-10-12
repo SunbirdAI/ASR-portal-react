@@ -1,203 +1,259 @@
-import Button from "@mui/material/Button";
-import SvgIcon from "@mui/material/SvgIcon";
-import { useEffect, useState } from "react";
-import { TailSpin } from "react-loader-spinner";
+import React, { useEffect, useRef, useState } from "react";
+import { Mic, Square, UploadCloud } from "lucide-react";
 import Swal from "sweetalert2";
-import {
-  Container,
-  DropZoneContainer,
-  LoadingContainer,
-  RecordingArea,
-  VerticalDottedLine,
-} from "./AudioInput.styles";
+
+const formatSeconds = (sec) => {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
 
 const AudioInput = ({ onAudioSubmit, isLoading }) => {
   const [dragActive, setDragActive] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioData, setAudioData] = useState([]);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      console.error("Media Devices will not work on your browser");
-      return;
-    }
-
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        const recorder = new MediaRecorder(stream);
-        setMediaRecorder(recorder);
-
-        recorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            setAudioData((prev) => [...prev, event.data]);
-          }
-        };
-      })
-      .catch(console.error);
-
     return () => {
-      if (mediaRecorder) {
-        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
 
-  const toggleRecording = () => {
-    if (!mediaRecorder) return;
+  const startRecording = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      Swal.fire({
+        icon: "error",
+        title: "Microphone Not Supported",
+        text: "Your browser does not support audio recording. Please upload an audio file instead.",
+      });
+      return;
+    }
 
     try {
-      if (mediaRecorder.state === "inactive" && !recording) {
-        setAudioData([]); // Clear previous recordings
-        mediaRecorder.start();
-        setRecording(true);
-      } else if (mediaRecorder.state === "recording" && recording) {
-        mediaRecorder.stop();
-        setRecording(false);
-      }
-    } catch (error) {
-      console.error("Error handling MediaRecorder:", error);
-    }
-  };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
 
-  useEffect(() => {
-    if (!recording && audioData.length > 0) {
-      const audioBlob = new Blob(audioData, { type: "audio/wav" });
-      // Create a File object with proper name and extension
-      const audioFile = new File([audioBlob], `recording_${Date.now()}.wav`, {
-        type: "audio/wav",
-      });
-      onAudioSubmit(audioFile);
-    }
-  }, [recording, audioData, onAudioSubmit]);
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
 
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file && file.type.startsWith("audio/")) {
-      if (file.size > 15 * 1024 * 1024) {
-        // alert("File size exceeds 15MB. Please contact the Sunbird team for support.");
-        Swal.fire({
-          icon: "error",
-          title: "File Too Large",
-          text: "The file you are trying to upload exceeds the maximum allowable size of 15MB. For larger file and longer audio support, please contact the Sunbird team at info@sunbird.ai.",
-        });
-        return;
-      }
+      const chunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
 
-      const audio = new Audio(URL.createObjectURL(file));
-      audio.onloadedmetadata = () => {
-        if (audio.duration > 15 * 60) {
-          // alert("Audio duration exceeds 15 minutes. Please contact the Sunbird team for support.");
-          Swal.fire({
-            icon: "error",
-            title: "Audio Too Long",
-            text: "The file you are trying to upload exceeds the maximum allowable Audio duration of 15 minutes. For larger file and longer audio support, please contact the Sunbird team at info@sunbird.ai.",
+      mediaRecorder.onstop = () => {
+        if (chunks.length > 0) {
+          const audioBlob = new Blob(chunks, { type: "audio/wav" });
+          const audioFile = new File([audioBlob], `recording_${Date.now()}.wav`, {
+            type: "audio/wav",
           });
-        } else {
-          onAudioSubmit(file);
+          onAudioSubmit(audioFile);
+        }
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
         }
       };
-      // onAudioSubmit(file);
+
+      setRecordSeconds(0);
+      mediaRecorder.start();
+      setRecording(true);
+
+      timerRef.current = setInterval(() => {
+        setRecordSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Microphone access error:", err);
+      Swal.fire({
+        icon: "warning",
+        title: "Microphone Access Required",
+        text: "Please enable microphone permission in your browser settings to record audio.",
+      });
     }
   };
 
-  const handleDragOver = (event) => event.preventDefault();
-  const handleDragEnter = (event) => {
-    event.preventDefault();
-    setDragActive(true);
+  const stopRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    setRecording(false);
   };
-  const handleDragLeave = (event) => {
-    event.preventDefault();
+
+  const handleValidateAndSubmitFile = (file) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("audio/") && !/\.(mp3|wav|m4a|ogg|flac|aac|wma)$/i.test(file.name)) {
+      Swal.fire({
+        icon: "error",
+        title: "Unsupported Format",
+        text: "Please upload a valid audio file (.mp3, .wav, .m4a, .ogg, .flac).",
+      });
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      Swal.fire({
+        icon: "error",
+        title: "File Too Large",
+        text: "Audio files are limited to 15MB. For enterprise quotas, please contact info@sunbird.ai.",
+      });
+      return;
+    }
+
+    onAudioSubmit(file);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleValidateAndSubmitFile(file);
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleValidateAndSubmitFile(file);
   };
-  const handleDrop = (event) => {
-    event.preventDefault();
-    setDragActive(false);
-    const file = event.dataTransfer.files[0];
-    if (file) handleFileChange({ target: { files: [file] } });
-  };
-  const handleButtonClick = () => document.getElementById("fileInput").click();
 
   return (
-    <Container>
-      <DropZoneContainer
-        className={`drop-zone ${dragActive ? "active" : ""}`}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
+    <div className="w-full flex flex-col gap-3">
+      {/* Drag & Drop Zone */}
+      <div
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
         onDrop={handleDrop}
-        onClick={handleButtonClick}
+        onClick={() => !isLoading && fileInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        className={`relative w-full rounded-2xl border-2 border-dashed p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 outline-none ${
+          dragActive
+            ? "border-amber-500 scale-[1.01]"
+            : "hover:border-amber-500/70"
+        }`}
+        style={{
+          background: dragActive ? "var(--color-accent-soft)" : "transparent",
+          borderColor: dragActive ? "var(--color-accent)" : "var(--color-border)",
+        }}
       >
-        {isLoading ? (
-          <LoadingContainer>
-            <TailSpin
-              height="50"
-              width="50"
-              color="var(--color-accent)"
-              ariaLabel="loading"
-            />
-          </LoadingContainer>
-        ) : (
-          "Click or drop your audio file here (max 15MB, up to 15 minutes)."
-        )}
-      </DropZoneContainer>
-      <VerticalDottedLine />
-      <RecordingArea>
-        <Button
-          aria-label={recording ? "Stop recording" : "Start recording"}
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+          style={{ background: "transparent", color: "var(--color-accent)" }}
+        >
+          <UploadCloud size={28} />
+        </div>
+
+        <p className="font-semibold text-sm sm:text-base m-0 mb-1" style={{ color: "var(--color-text)" }}>
+          Drag & drop audio here, or <span style={{ color: "var(--color-accent)" }}>browse files</span>
+        </p>
+
+        <p className="text-xs m-0" style={{ color: "var(--color-muted)" }}>
+          Supports MP3, WAV, M4A, OGG, FLAC · Up to 15MB (15 mins)
+        </p>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"
+          onChange={handleFileChange}
+          style={{ display: "none" }}
           disabled={isLoading}
-          onClick={toggleRecording}
-          sx={{
-            borderRadius: "999px",
-            minHeight: 48,
-            minWidth: 48,
-            px: 2,
-            py: 1.5,
-            color: "var(--color-text)",
-            background: recording
-              ? "var(--color-accent-soft)"
-              : "var(--color-surface)",
-            border: recording
-              ? "1px solid rgba(217,119,6,0.4)"
-              : "1px solid var(--color-border)",
-            "&:hover": {
-              background: "var(--color-pill)",
-            },
-            "&:focus-visible": {
-              outline: "3px solid var(--color-focus-ring)",
-              outlineOffset: "2px",
-            },
-            "& .MuiButton-startIcon": {
-              margin: 0,
-            },
+        />
+      </div>
+
+      {/* Or Divider & Microphone Action */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-[1px]" style={{ background: "var(--color-border)" }} />
+        <span className="text-xs uppercase font-medium tracking-wider" style={{ color: "var(--color-muted)" }}>
+          Or Record Live
+        </span>
+        <div className="flex-1 h-[1px]" style={{ background: "var(--color-border)" }} />
+      </div>
+
+      {/* Recording Bar Card */}
+      <div
+        className="w-full rounded-2xl p-3.5 flex items-center justify-between gap-3 border transition-all"
+        style={{
+          background: recording ? "var(--color-accent-soft)" : "transparent",
+          borderColor: recording ? "var(--color-accent)" : "var(--color-border)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              recording ? "animate-pulse" : ""
+            }`}
+            style={{
+              background: recording ? "var(--color-accent)" : "var(--color-pill)",
+              color: recording ? "#ffffff" : "var(--color-text)",
+            }}
+          >
+            {recording ? <Square size={16} fill="currentColor" /> : <Mic size={18} />}
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold m-0" style={{ color: "var(--color-text)" }}>
+              {recording ? "Recording in progress..." : "Voice recording"}
+            </p>
+            <p className="text-xs m-0" style={{ color: "var(--color-muted)" }}>
+              {recording
+                ? `Recording time: ${formatSeconds(recordSeconds)}`
+                : "Capture audio directly from your microphone"}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <button
+          type="button"
+          onClick={recording ? stopRecording : startRecording}
+          disabled={isLoading}
+          className="px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 shadow-sm"
+          style={{
+            backgroundColor: recording ? "var(--color-accent)" : "transparent",
+            color: recording ? "#ffffff" : "var(--color-text)",
+            border: `1px solid ${recording ? "var(--color-accent)" : "var(--color-border)"}`,
           }}
         >
-          {recording ? <StopIcon /> : <MicIcon />}
-        </Button>
-      </RecordingArea>
-      <input
-        id="fileInput"
-        type="file"
-        accept="audio/*"
-        onChange={handleFileChange}
-        style={{ display: "none" }}
-        disabled={isLoading}
-      />
-    </Container>
+          {recording ? (
+            <>
+              <Square size={13} fill="currentColor" />
+              <span>Stop & Use</span>
+            </>
+          ) : (
+            <>
+              <Mic size={14} />
+              <span>Record</span>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
   );
 };
 
 export default AudioInput;
-
-const MicIcon = () => (
-  <SvgIcon>
-    <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
-  </SvgIcon>
-);
-
-const StopIcon = () => (
-  <SvgIcon sx={{ color: "var(--color-accent)" }}>
-    <circle cx="12" cy="12" r="10" />
-  </SvgIcon>
-);
