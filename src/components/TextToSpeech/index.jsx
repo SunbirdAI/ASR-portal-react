@@ -65,16 +65,23 @@ const TextToSpeech = () => {
   const [hasUserTyped, setHasUserTyped] = useState(false);
   const [language, setLanguage] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem(PREFERRED_TTS_LANG_KEY) || DEFAULT_TTS_LANGUAGE;
+      const saved = localStorage.getItem(PREFERRED_TTS_LANG_KEY);
+      if (saved && getTtsLanguage(saved)) {
+        return saved;
+      }
+      return DEFAULT_TTS_LANGUAGE;
     }
     return DEFAULT_TTS_LANGUAGE;
   });
   const [voice, setVoice] = useState("");
+  const [genderFilter, setGenderFilter] = useState("all");
   const [voiceCatalog, setVoiceCatalog] = useState({});
+  const [voicesData, setVoicesData] = useState({});
   const [isLoadingVoices, setIsLoadingVoices] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
   const [audioUrl, setAudioUrl] = useState("");
+  const [generatedSpeaker, setGeneratedSpeaker] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -86,6 +93,7 @@ const TextToSpeech = () => {
         const response = await getSpeechVoices();
         if (isActive) {
           setVoiceCatalog(response.by_language || {});
+          setVoicesData(response.voices || {});
         }
       } catch (err) {
         console.error("Voices fetch error:", err);
@@ -112,7 +120,23 @@ const TextToSpeech = () => {
   }, [isGenerating]);
 
   const selectedLangObj = getTtsLanguage(language) || TTS_LANGUAGE_OPTIONS[0];
-  const availableVoices = voiceCatalog[language] || [];
+  const availableVoiceNames = voiceCatalog[language] || [];
+  const languageVoiceObjects = voicesData[language] || [];
+  const voicesToDisplay = availableVoiceNames.map((name) => {
+    const detail = languageVoiceObjects.find((item) => item.name === name);
+    return {
+      name,
+      gender: detail?.gender || null,
+    };
+  });
+  const femaleVoiceCount = voicesToDisplay.filter((v) => v.gender === "female").length;
+  const maleVoiceCount = voicesToDisplay.filter((v) => v.gender === "male").length;
+  const hasMultipleGenders = femaleVoiceCount > 0 && maleVoiceCount > 0;
+  const visibleVoices = voicesToDisplay.filter((v) => {
+    if (genderFilter === "female") return v.gender === "female";
+    if (genderFilter === "male") return v.gender === "male";
+    return true;
+  });
   const charsLeft = MAX_TEXT_LENGTH - textInput.length;
   const isNearLimit = charsLeft < 60;
 
@@ -124,6 +148,7 @@ const TextToSpeech = () => {
       const nextLang = option.value;
       setLanguage(nextLang);
       setVoice("");
+      setGenderFilter("all");
       setAudioUrl("");
       localStorage.setItem(PREFERRED_TTS_LANG_KEY, nextLang);
 
@@ -188,9 +213,12 @@ const TextToSpeech = () => {
     setSuccessMessage("");
     setLoadingSeconds(0);
 
+    const activeVoice = voice || (voicesToDisplay[0]?.name || "");
+
     try {
-      const response = await generateSpeech(trimmed, { language, voice });
+      const response = await generateSpeech(trimmed, { language, voice: activeVoice });
       setAudioUrl(response.audio_url);
+      setGeneratedSpeaker(activeVoice);
       setSuccessMessage("Speech generated successfully!");
     } catch (err) {
       console.error("TTS generation error:", err);
@@ -210,16 +238,24 @@ const TextToSpeech = () => {
     setIsExampleSelected(false);
     setSelectedExampleIndex(null);
     setHasUserTyped(false);
+    setVoice("");
+    setGenderFilter("all");
     setAudioUrl("");
+    setGeneratedSpeaker("");
     setErrorMessage("");
     setSuccessMessage("");
   };
 
   const handleDownloadAudio = () => {
     if (!audioUrl) return;
+    const speakerTag = (generatedSpeaker || voice || voicesToDisplay[0]?.name || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const a = document.createElement("a");
     a.href = audioUrl;
-    a.download = `sunbird_tts_${language}_${Date.now()}.mp3`;
+    a.download = speakerTag
+      ? `sunbird_tts_${language}_${speakerTag}_${Date.now()}.mp3`
+      : `sunbird_tts_${language}_${Date.now()}.mp3`;
     a.target = "_blank";
     a.click();
   };
@@ -331,10 +367,10 @@ const TextToSpeech = () => {
         </div>
 
         {/* Right Column: Voice & Generation Actions */}
-        <div className="lg:col-span-5 flex flex-col gap-5">
+        <div className="lg:col-span-5 flex flex-col gap-5 min-w-0">
           {/* Language & Voice Selector Card */}
           <div
-            className="rounded-2xl p-5 border flex flex-col gap-4"
+            className="rounded-2xl p-4 sm:p-5 border flex flex-col gap-4 min-w-0"
             style={{
               background: "var(--color-surface)",
               borderColor: "var(--color-border)",
@@ -351,50 +387,226 @@ const TextToSpeech = () => {
                 Language
               </label>
               <Autocomplete
+                autoHighlight
                 disableClearable
+                isOptionEqualToValue={(option, value) => option.value === value.value}
                 options={TTS_LANGUAGE_OPTIONS}
                 getOptionLabel={(opt) => `${opt.label} (${opt.value})`}
                 value={selectedLangObj}
                 onChange={handleLanguageChange}
                 renderInput={(params) => (
-                  <TextField {...params} size="small" placeholder="Select TTS language..." />
+                  <TextField
+                    {...params}
+                    size="small"
+                    placeholder="Select TTS language..."
+                    inputProps={{
+                      ...params.inputProps,
+                      autoComplete: "off",
+                      enterKeyHint: "done",
+                      style: {
+                        fontSize: "16px", // 16px font prevents iOS Safari from automatically zooming/jumping viewport on mobile
+                      },
+                    }}
+                  />
                 )}
+                renderOption={(props, option) => {
+                  const optProps = { ...props };
+                  delete optProps.key;
+                  return (
+                    <li
+                      key={option.value}
+                      {...optProps}
+                      className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs cursor-pointer hover:bg-amber-500/10 transition-colors"
+                      style={{ color: "var(--color-text)" }}
+                    >
+                      <span className="font-semibold text-xs">{option.label}</span>
+                      <span
+                        className="font-mono text-[11px] px-1.5 py-0.5 rounded"
+                        style={{
+                          background: "var(--color-pill)",
+                          color: "var(--color-muted)",
+                        }}
+                      >
+                        {option.value}
+                      </span>
+                    </li>
+                  );
+                }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      color: "var(--color-text)",
+                      backgroundColor: "var(--color-surface)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "0.75rem",
+                      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.2)",
+                      marginTop: "4px",
+                      maxHeight: "260px",
+                    },
+                  },
+                  popper: {
+                    modifiers: [
+                      {
+                        name: "preventOverflow",
+                        options: {
+                          boundary: "viewport",
+                          padding: 8,
+                        },
+                      },
+                      {
+                        name: "flip",
+                        options: {
+                          fallbackPlacements: ["bottom-start", "top-start"],
+                        },
+                      },
+                    ],
+                    sx: {
+                      zIndex: 1400,
+                      maxWidth: "calc(100vw - 32px)",
+                    },
+                  },
+                }}
                 sx={{
+                  width: "100%",
                   "& .MuiOutlinedInput-root": {
                     color: "var(--color-text)",
                     backgroundColor: "var(--color-pill)",
                     borderRadius: "0.75rem",
-                    fontSize: "0.875rem",
+                    fontSize: "16px", // Prevents iOS mobile viewport zoom
                     "& fieldset": { borderColor: "var(--color-border)" },
+                    "&:hover fieldset": { borderColor: "var(--color-accent)" },
+                    "&.Mui-focused fieldset": { borderColor: "var(--color-accent)" },
+                  },
+                  "& .MuiInputBase-input": {
+                    fontSize: "16px !important", // Prevents iOS mobile viewport zoom
+                    color: "var(--color-text)",
                   },
                 }}
               />
             </div>
 
             {/* Speaker Voice Selector */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
-                Speaker Voice
-              </label>
-              {availableVoices.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {availableVoices.map((v, i) => {
-                    const isSelected = voice === v || (!voice && i === 0);
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
+                  Speaker Voice
+                </label>
+                {voicesToDisplay.length > 0 && (
+                  <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                    {voicesToDisplay.length} {voicesToDisplay.length === 1 ? "voice" : "voices"} available
+                  </span>
+                )}
+              </div>              {/* Quick Gender Filter Pills when language has both male and female voices */}
+              {hasMultipleGenders && (
+                <div
+                  className="flex items-center gap-1.5 p-1 rounded-xl border"
+                  style={{ background: "var(--color-pill)", borderColor: "var(--color-border)" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setGenderFilter("all")}
+                    className={`flex-1 py-1 px-2 rounded-lg text-xs font-medium transition-all text-center ${
+                      genderFilter === "all" ? "shadow-sm font-semibold" : "hover:opacity-80"
+                    }`}
+                    style={{
+                      background: genderFilter === "all" ? "var(--color-surface)" : "transparent",
+                      color: genderFilter === "all" ? "var(--color-accent)" : "var(--color-muted)",
+                    }}
+                  >
+                    All ({voicesToDisplay.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGenderFilter("female")}
+                    className={`flex-1 py-1 px-2 rounded-lg text-xs font-medium transition-all text-center ${
+                      genderFilter === "female" ? "shadow-sm font-semibold" : "hover:opacity-80"
+                    }`}
+                    style={{
+                      background: genderFilter === "female" ? "var(--color-surface)" : "transparent",
+                      color: genderFilter === "female" ? "var(--color-accent)" : "var(--color-muted)",
+                    }}
+                  >
+                    Female ({femaleVoiceCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGenderFilter("male")}
+                    className={`flex-1 py-1 px-2 rounded-lg text-xs font-medium transition-all text-center ${
+                      genderFilter === "male" ? "shadow-sm font-semibold" : "hover:opacity-80"
+                    }`}
+                    style={{
+                      background: genderFilter === "male" ? "var(--color-surface)" : "transparent",
+                      color: genderFilter === "male" ? "var(--color-accent)" : "var(--color-muted)",
+                    }}
+                  >
+                    Male ({maleVoiceCount})
+                  </button>
+                </div>
+              )}
+
+              {/* Voice Cards */}
+              {visibleVoices.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-0.5">
+                  {visibleVoices.map((v) => {
+                    const isSelected = voice === v.name || (!voice && v.name === voicesToDisplay[0]?.name);
                     return (
                       <button
-                        key={v}
+                        key={v.name}
                         type="button"
-                        onClick={() => setVoice(v)}
-                        className={`p-2.5 rounded-xl border text-xs font-medium transition-all ${
-                          isSelected ? "shadow-sm" : "hover:opacity-80"
+                        onClick={() => setVoice(v.name)}
+                        className={`p-2.5 rounded-xl border text-xs transition-all flex items-center justify-between gap-2.5 text-left w-full cursor-pointer ${
+                          isSelected
+                            ? "shadow-sm ring-1 ring-amber-500/40"
+                            : "hover:border-amber-500/30"
                         }`}
                         style={{
                           background: isSelected ? "var(--color-accent-soft)" : "var(--color-pill)",
                           borderColor: isSelected ? "var(--color-accent)" : "var(--color-border)",
-                          color: isSelected ? "var(--color-accent)" : "var(--color-text)",
+                          color: "var(--color-text)",
                         }}
                       >
-                        Voice {i + 1}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Avatar Circle */}
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold border transition-colors"
+                            style={{
+                              background: isSelected ? "var(--color-accent)" : "var(--color-surface)",
+                              color: isSelected ? "#ffffff" : "var(--color-text)",
+                              borderColor: isSelected ? "var(--color-accent)" : "var(--color-border)",
+                            }}
+                          >
+                            {v.name.charAt(0)}
+                          </div>
+
+                          {/* Voice Name & Gender Indicator */}
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold text-xs leading-tight truncate">
+                              {v.name}
+                            </span>
+                            <span
+                              className="text-[10px] capitalize leading-none truncate font-normal mt-0.5"
+                              style={{
+                                color: isSelected ? "var(--color-accent)" : "var(--color-muted)",
+                              }}
+                            >
+                              {v.gender ? `${v.gender} voice` : "Natural voice"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Selected Indicator */}
+                        {isSelected ? (
+                          <CheckCircle2
+                            size={16}
+                            className="shrink-0"
+                            style={{ color: "var(--color-accent)" }}
+                          />
+                        ) : (
+                          <div
+                            className="w-3.5 h-3.5 rounded-full border shrink-0 opacity-40"
+                            style={{ borderColor: "var(--color-muted)" }}
+                          />
+                        )}
                       </button>
                     );
                   })}
@@ -408,7 +620,7 @@ const TextToSpeech = () => {
                     color: "var(--color-muted)",
                   }}
                 >
-                  {isLoadingVoices ? "Loading voices..." : "Default natural neural voice"}
+                  {isLoadingVoices ? "Loading voices..." : "No voices available for this filter."}
                 </div>
               )}
             </div>
@@ -493,9 +705,23 @@ const TextToSpeech = () => {
               }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-accent)" }}>
-                  Generated Audio Result
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-accent)" }}>
+                    Generated Audio Result
+                  </span>
+                  {generatedSpeaker && (
+                    <span
+                      className="text-[11px] font-semibold px-2 py-0.5 rounded-full border"
+                      style={{
+                        background: "var(--color-accent-soft)",
+                        borderColor: "var(--color-accent)",
+                        color: "var(--color-accent)",
+                      }}
+                    >
+                      {generatedSpeaker}
+                    </span>
+                  )}
+                </div>
 
                 <button
                   type="button"
@@ -512,7 +738,10 @@ const TextToSpeech = () => {
                 </button>
               </div>
 
-              <AudioPlayer audioSrc={audioUrl} fileName={`TTS_${language}_output.mp3`} />
+              <AudioPlayer
+                audioSrc={audioUrl}
+                fileName={`TTS_${language}_${(generatedSpeaker || voice || voicesToDisplay[0]?.name || "output").trim().replace(/\s+/g, "_")}.mp3`}
+              />
             </div>
           )}
         </div>
