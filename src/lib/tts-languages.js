@@ -11,7 +11,7 @@ export const TTS_LANGUAGE_OPTIONS = [
   { label: "Kinyarwanda", value: "kin" },
   { label: "Lingala", value: "lin" },
   { label: "Luganda", value: "lug" },
-  { label: "Luo (Dholuo)", value: "luo" },
+  // { label: "Luo (Dholuo)", value: "luo" },
   { label: "Runyankole", value: "nyn" },
   { label: "Swahili", value: "swa" },
   { label: "Xhosa", value: "xho" },
